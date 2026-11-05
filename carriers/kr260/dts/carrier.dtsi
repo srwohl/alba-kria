@@ -1,6 +1,6 @@
 /*
  * AMD KR260 (revB, A03) carrier with a production K26C SOM.
- * SOM devices (QSPI, eMMC) live in som/k26/dts/; scripts/gen_sdt.sh merges
+ * SOM devices (QSPI, eMMC) live in som/k26/dts/; scripts/generate_sdt.sh merges
  * them ahead of this file and passes the result to SDTGen as -user_dts.
  *
  * Converted from AMD's overlay arch/arm/dts/zynqmp-sck-kr-g-revB.dtso in
@@ -12,7 +12,7 @@
  *   DP83867_RGMIIDCTL_2_25_NS 0x8, _2_75_NS 0xa, _FIFO_DEPTH_4_B_NIB 0x1,
  *   SLEW_RATE_SLOW 1, SLEW_RATE_FAST 0, IO_STANDARD_LVCMOS18 1.
  *
- * The PS side of these settings is carriers/kr260/bd/design_1.tcl.
+ * The PS side of these settings is carriers/kr260/bd/kr260.tcl.
  */
 / {
 	compatible = "xlnx,zynqmp-sk-kr260-revB",

@@ -1,6 +1,6 @@
 /*
  * FIM2 MainBoard carrier for the K26 SOM: everything reached through SOM240.
- * SOM devices (QSPI, eMMC) live in som/k26/dts/; scripts/gen_sdt.sh merges
+ * SOM devices (QSPI, eMMC) live in som/k26/dts/; scripts/generate_sdt.sh merges
  * them ahead of this file and passes the result to SDTGen as -user_dts.
  * Binding constants are written as numbers, without C preprocessing.
  *
@@ -10,7 +10,7 @@
  * panda-load-firmware identifies the board from the model string.
  */
 / {
-	model = "PandA FIM2";
+	model = "FIM2";
 	/* SDTGen 2026.1 falls back to k26c-microblaze without a stock board DTS. */
 	compatible = "xlnx,zynqmp";
 	aliases {
@@ -39,7 +39,7 @@
  *
  * REFCLK0 is the 125 MHz Y8 and REFCLK1 the 27 MHz Y11, matching
  * CONFIG.PSU__GEM0__REF_CLK_SEL and CONFIG.PSU__DP__REF_CLK_SEL in
- * carriers/fim2/bd/design_1.tcl.  Keep them in step: psu_init programs the
+ * carriers/fim2/bd/fim2.tcl.  Keep them in step: psu_init programs the
  * SERDES from the block design, while Linux reprograms each lane from its
  * "phys" cells (below for GEM0, generated in pcw.dtsi for DisplayPort).
  *
@@ -227,4 +227,3 @@
 		};
 	};
 };
-

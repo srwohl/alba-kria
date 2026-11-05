@@ -39,7 +39,7 @@ HW_SERVER        ?=
 
 # ---- Sources and outputs
 CARRIER_DIR := carriers/$(CARRIER)
-BD_TCL      := $(CARRIER_DIR)/bd/design_1.tcl
+BD_TCL      := $(CARRIER_DIR)/bd/$(CARRIER).tcl
 BUILD       := build
 OUT         := $(BUILD)/$(CARRIER)
 LOGS        := $(OUT)/logs
@@ -82,8 +82,8 @@ $(XSA): $(BD_TCL) scripts/vivado/export_xsa.tcl project.mk $(CARRIER_DIR)/carrie
 	    -tclargs $(PART) $(BOARD_PART) $(TOOL_VERSION) $(CURDIR)/$(BD_TCL) $(CURDIR)/$(XSA)
 	@test -s $@ || { echo "Vivado did not produce $@" >&2; exit 1; }
 
-$(SDT): $(XSA) $(DTSI) scripts/gen_sdt.sh
-	bash scripts/gen_sdt.sh "$(XSA)" "$(SDTGEN)" "$(DTC)" "$(DTS_CPP)" $(DTSI)
+$(SDT): $(XSA) $(DTSI) scripts/generate_sdt.sh
+	bash scripts/generate_sdt.sh "$(XSA)" "$(SDTGEN)" "$(DTC)" "$(DTS_CPP)" $(DTSI)
 
 ##@ Software (setup: host shell; machine, boot: yocto shell)
 

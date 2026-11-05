@@ -1,6 +1,6 @@
 /*
  * K26 SOM: devices on the SOM itself, common to every carrier and variant.
- * Merged with the carrier's dts/carrier.dtsi by scripts/gen_sdt.sh.
+ * Merged with the carrier's dts/carrier.dtsi by scripts/generate_sdt.sh.
  * Binding constants are written as numbers, without C preprocessing.
  */
 

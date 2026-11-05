@@ -4,14 +4,16 @@
 # vivado -mode batch -source export_xsa.tcl \
 #     -tclargs <part> <board_part> <tool_version> <bd_tcl> <output.xsa>
 #
-# <bd_tcl> is carriers/<carrier>/bd/design_1.tcl. The Vivado project is
-# created next to the XSA, in vivado/. All paths must be absolute.
+# <bd_tcl> is carriers/<carrier>/bd/<carrier>.tcl, which creates the block
+# design of the same name. The Vivado project is created next to the XSA,
+# in vivado/. All paths must be absolute.
 if {[llength $argv] != 5} {
     puts stderr "usage: -tclargs <part> <board_part> <tool_version> <bd_tcl> <output.xsa>"
     exit 1
 }
 lassign $argv part board_part tool_version bd_tcl xsa
 set build_dir [file dirname $xsa]
+set bd_name [file rootname [file tail $bd_tcl]]
 
 if {[catch {
     # The generated design Tcl checks this too, but returns a status rather
@@ -28,15 +30,15 @@ if {[catch {
         error "$bd_tcl failed with status $result."
     }
 
-    set bd_file [get_files -quiet */design_1.bd]
+    set bd_file [get_files -quiet */$bd_name.bd]
     if {[llength $bd_file] != 1} {
-        error "Expected exactly one design_1.bd after sourcing $bd_tcl."
+        error "Expected exactly one $bd_name.bd after sourcing $bd_tcl."
     }
     validate_bd_design
     save_bd_design
     generate_target all $bd_file
     add_files -norecurse [make_wrapper -files $bd_file -top]
-    set_property top design_1_wrapper [current_fileset]
+    set_property top ${bd_name}_wrapper [current_fileset]
     update_compile_order -fileset sources_1
 
     # No -include_bit: this first handoff does not run synthesis/implementation.
