@@ -49,11 +49,13 @@ version_re="Gen Machine Conf v${tool_version//./\\.}([^0-9.]|\$)"
     fail "expected gen-machine-conf $tool_version, got: $version"
 mkdir -p "$output_dir"
 printf '%s\n' "$version" > "$output_dir/tool-version.txt"
+# No -l: it would append a hard MACHINE = "<machine>" to the shared
+# local.conf on every run, and the last carrier generated would then win for
+# every build. build_boot.sh passes MACHINE per carrier instead.
 "$generator_path" parse-sdt \
     --hw-description "$sdt_dir" \
     --machine-name "$machine" \
     -c "$yocto_dir/conf" \
-    -l "$yocto_dir/conf/local.conf" \
     --output "$output_dir" \
     > "$output_dir/console.log" 2>&1 || {
         cat "$output_dir/console.log" >&2
