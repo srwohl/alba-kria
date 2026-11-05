@@ -31,6 +31,8 @@ GEN_MACHINE_CONF ?= gen-machine-conf
 
 # ---- Options
 SYNC_JOBS        ?= 4
+# Disk image recipe built by make image
+IMAGE_RECIPE     ?= edf-linux-disk-image
 # Set empty on hosts that do not need the namespace-enabled AppArmor profile.
 APPARMOR_PROFILE ?= bitbake
 # Flashing: IMAGE=path, DRY_RUN=1 prints the command only, HW_SERVER=host
@@ -60,7 +62,7 @@ require = @command -v "$($(1))" >/dev/null 2>&1 || { echo "$(1)=$($(1)) not foun
 
 .DEFAULT_GOAL := help
 .DELETE_ON_ERROR:
-.PHONY: help config xsa sdt gui bd-export setup machine boot flash-tool flash-qspi flash-emmc clean
+.PHONY: help config xsa sdt gui bd-export setup machine boot image flash-tool flash-qspi flash-emmc clean
 
 ##@ General
 
@@ -124,7 +126,10 @@ machine: ## Generate the Yocto machine conf from the SDT
 	bash scripts/generate_machine.sh "$(CURDIR)" "$(GEN_MACHINE_CONF)" "$(MACHINE)" "$(TOOL_VERSION)" "$(CURDIR)/$(OUT)"
 
 boot: ## Build BOOT.BIN (xilinx-bootbin)
-	bash scripts/build_boot.sh "$(CURDIR)" "$(BITBAKE)" "$(MACHINE)" "$(APPARMOR_PROFILE)"
+	bash scripts/build_yocto.sh "$(CURDIR)" "$(BITBAKE)" "$(MACHINE)" "$(APPARMOR_PROFILE)" xilinx-bootbin
+
+image: ## Build the eMMC disk image (.wic.gz): IMAGE_RECIPE=edf-linux-disk-image
+	bash scripts/build_yocto.sh "$(CURDIR)" "$(BITBAKE)" "$(MACHINE)" "$(APPARMOR_PROFILE)" "$(IMAGE_RECIPE)"
 
 ##@ Programming (vivado shell; DRY_RUN=1 never touches hardware)
 

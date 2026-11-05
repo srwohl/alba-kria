@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build BOOT.BIN (xilinx-bootbin) for the generated machine.
+# Build a BitBake target (BOOT.BIN, a disk image) for one carrier's machine.
 # Run in the Yocto shell: source build/edf/edf-init-build-env build/yocto
 set -euo pipefail
 
@@ -8,9 +8,10 @@ bitbake=${2:-bitbake}
 machine=${3:?machine required}
 # Empty on hosts that do not need the namespace-enabled AppArmor profile.
 apparmor_profile=${4-bitbake}
+target=${5:?BitBake target required}
 yocto_dir="$repo_dir/build/yocto"
 
-fail() { printf 'Boot build: %s\n' "$*" >&2; exit 1; }
+fail() { printf 'Yocto build: %s\n' "$*" >&2; exit 1; }
 
 [[ -n "${BUILDDIR:-}" && "$(realpath "$BUILDDIR")" == "$yocto_dir" ]] ||
     fail "source build/edf/edf-init-build-env with $yocto_dir as the build directory first."
@@ -25,7 +26,7 @@ grep -q '/meta-alba-kria ' "$yocto_dir/conf/bblayers.conf" ||
 ! grep -Eq '^[[:space:]]*MACHINE[[:space:]]*=' "$yocto_dir/conf/local.conf" ||
     fail "conf/local.conf assigns MACHINE, which would override $machine; remove that line."
 
-cmd=(env MACHINE="$machine" "$bitbake" xilinx-bootbin)
+cmd=(env MACHINE="$machine" "$bitbake" "$target")
 [[ -z "$apparmor_profile" ]] || cmd=(aa-exec -p "$apparmor_profile" -- "${cmd[@]}")
 cd "$yocto_dir"
 exec "${cmd[@]}"
