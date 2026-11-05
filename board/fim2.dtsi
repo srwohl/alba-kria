@@ -1,0 +1,290 @@
+/*
+ * FIM2 MainBoard with a K26 SOM. Included by SDTGen using -user_dts;
+ * do not include system-top.dts here (it includes this file).
+ * Binding constants are written as numbers, without C preprocessing.
+ *
+ * Migrated from the 2024.2 board tree. Check labels and merged properties
+ * against the generated 2026.1 tree before using this on hardware.
+ *
+ * panda-load-firmware identifies the board from the model string.
+ */
+/ {
+	model = "PandA FIM2";
+	/* SDTGen 2026.1 falls back to k26c-microblaze without a stock board DTS. */
+	compatible = "xlnx,zynqmp";
+	aliases {
+		mmc0 = &sdhci0;
+		ethernet0 = &gem0;
+		ethernet1 = &gem1;
+	};
+
+	clk_125: clock0 { /* Y8 - 125 MHz GEM0 SGMII reference */
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <125000000>;
+	};
+
+	clk_27: clock1 { /* Y11 - 27 MHz DisplayPort reference */
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <27000000>;
+	};
+
+};
+
+/*
+ * GEM0 runs SGMII over PS-GT lane 0 and DisplayPort uses lane 1.  The
+ * generated pcw.dtsi enables &psgtr but does not describe its reference
+ * clocks, so name them here.
+ *
+ * REFCLK0 is the 125 MHz Y8 and REFCLK1 the 27 MHz Y11, matching
+ * CONFIG.PSU__GEM0__REF_CLK_SEL {Ref Clk0} and CONFIG.PSU__DP__REF_CLK_SEL
+ * {Ref Clk1} in board/fim2.tcl.  Keep them in step: psu_init programs the
+ * SERDES from the block design, while Linux reprograms each lane from its
+ * "phys" cells (below for GEM0, generated in pcw.dtsi for DisplayPort).
+ *
+ * The 26 MHz Y9 on REFCLK2 is for USB 3.0, which is not enabled.
+ */
+&psgtr {
+	clocks = <&clk_125>, <&clk_27>;
+	clock-names = "ref0", "ref1";
+};
+
+/* DP STC, audio and video clock rates, as on the KR260 */
+&zynqmp_dpsub {
+	assigned-clock-rates = <27000000>, <25000000>, <300000000>;
+};
+
+&qspi { /* MIO 0-5, on the SOM */
+	flash0: flash@0 { /* MT25QU512A */
+		compatible = "jedec,spi-nor"; /* 64MB */
+		reg = <0>;
+		spi-tx-bus-width = <4>;
+		spi-rx-bus-width = <4>;
+		spi-max-frequency = <40000000>; /* 40MHz */
+
+		/*
+		 * Development layout for the raw boot.bin programmed at QSPI
+		 * offset 0.  This is not the Kria Image Selector/A-B/recovery
+		 * layout.
+		 */
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "Boot Image (FSBL, PMU, ATF, U-Boot)";
+				reg = <0x0 0x200000>; /* raw boot.bin, aligned to 2MB */
+				read-only;
+				lock;
+			};
+			partition@200000 {
+				label = "QSPI User";
+				reg = <0x200000 0x3e00000>; /* remainder of 64MB flash */
+			};
+		};
+	};
+};
+
+&pinctrl0 {
+	status = "okay";
+	pinctrl_usb_reset_default: usb-reset-default {
+		mux {
+			groups = "gpio0_76_grp";
+			function = "gpio0";
+		};
+		conf {
+			pins = "MIO76";
+			power-source = <1>; /* PS bank 502: 1.8 V */
+			bias-pull-up; /* Leave the sequencer enabled when unclaimed. */
+			slew-rate = <1>;
+			drive-strength = <4>;
+			output-enable; /* Remove the boot firmware's MIO tri-state. */
+		};
+	};
+
+	pinctrl_sdhci0_default: sdhci0-default {
+		conf {
+			groups = "sdio0_0_grp";
+			slew-rate = <1>;
+			power-source = <1>;
+			bias-disable;
+		};
+
+		mux {
+			groups = "sdio0_0_grp";
+			function = "sdio0";
+		};
+	};
+};
+
+/*
+ * MIO76 pulls U54's EN low through D15 to reset the USB PHY, hub and SD
+ * reader together. Keep it available for the manual Linux reset helper;
+ * assigning it to the hub driver would also reset the upstream PHY.
+ * GPIO direction stays input until userspace requests an output.
+ */
+&gpio {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_usb_reset_default>;
+	gpio-line-names =
+		"", "", "", "", "", "", "", "", /* 0..7 */
+		"", "", "", "", "", "", "", "", /* 8..15 */
+		"", "", "", "", "", "", "", "", /* 16..23 */
+		"", "", "", "", "", "", "", "", /* 24..31 */
+		"", "", "", "", "", "", "", "", /* 32..39 */
+		"", "", "", "", "", "", "", "", /* 40..47 */
+		"", "", "", "", "", "", "", "", /* 48..55 */
+		"", "", "", "", "", "", "", "", /* 56..63 */
+		"", "", "", "", "", "", "", "", /* 64..71 */
+		"", "", "", "", "FIM2_USB_RESET_N"; /* 72..76 */
+};
+
+&sdhci0 { /* eMMC on the production SOM */
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_sdhci0_default>;
+	non-removable;
+	disable-wp;
+	no-sd;
+	no-sdio;
+	cap-mmc-hw-reset;
+	bus-width = <8>;
+	xlnx,mio-bank = <0>;
+	assigned-clock-rates = <187498123>;
+};
+
+/*
+ * I2C0, MIO 42/43: SFP management bus through U36 (J21) and U60 (J8).  Its
+ * level-shifter enables on MIO 38-40 are pulled up, so both cages answer at
+ * 0x50/0x51; nothing is described here yet.
+ */
+
+/*
+ * I2C1, MIO 24/25: shared by the SOM (PMICs, SOM EEPROM at 0x50 and 0x58)
+ * and, through U37, the carrier, the FMC and the RearBoard/FrontBoard
+ * EEPROMs.  Only carrier devices are described.  There is no I2C mux and no
+ * reset expander on FIM2.
+ */
+&i2c1 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	hub_1: usb-hub@2d { /* U19 USB5744 */
+		compatible = "microchip,usb5744";
+		reg = <0x2d>;
+	};
+
+	temp-sensor@49 { /* U32 TMP1075 */
+		compatible = "ti,tmp1075";
+		reg = <0x49>;
+	};
+
+	temp-sensor@4d { /* U34 TMP1075 */
+		compatible = "ti,tmp1075";
+		reg = <0x4d>;
+	};
+
+	/*
+	 * 24AA025E48 MAC EEPROMs.  The upper half, which holds the factory
+	 * EUI-48 at 0xfa, is write-protected in the part.
+	 */
+	eeprom@51 { /* U33 */
+		compatible = "microchip,24aa025e48", "atmel,24c02";
+		reg = <0x51>;
+		read-only;
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		gem0_mac: mac-address@fa {
+			reg = <0xfa 0x6>;
+		};
+	};
+
+	eeprom@52 { /* U35, 0x56 when JP12 is moved */
+		compatible = "microchip,24aa025e48", "atmel,24c02";
+		reg = <0x52>;
+		read-only;
+	};
+
+	/*
+	 * Y10 drives GTH REFCLK0 for the SFP+ cages.  It powers up at about
+	 * 10 MHz, so set the 156.25 MHz the SFP core expects.  Any stability
+	 * other than 7 ppm selects registers 7-12, which is what the part on
+	 * the prototype answers on.
+	 */
+	si570: clock-generator@55 {
+		compatible = "silabs,si570";
+		reg = <0x55>;
+		#clock-cells = <0>;
+		temperature-stability = <50>;
+		factory-fout = <10000000>;
+		clock-frequency = <156250000>;
+		clock-output-names = "sfp_refclk";
+	};
+};
+
+/*
+ * USB0, MIO 52-63: U18 USB3320 ULPI PHY, U19 USB5744 hub and U29 USB2244
+ * card reader. U54 LM3880 sequences their resets; MIO76 is a manual override
+ * of its enable, not a dedicated reset GPIO for any one USB device.
+ * USB 3.0 is not enabled, so the controller is limited to high speed.
+ */
+&usb0 {
+	/* The generated Kria tree's dedicated reset GPIO is not wired on FIM2. */
+	/delete-property/ reset-gpios;
+};
+
+&dwc3_0 {
+	dr_mode = "host";
+	maximum-speed = "high-speed";
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	hub_2_0: hub@1 { /* USB5744 USB 2.0 hub */
+		compatible = "usb424,2744";
+		reg = <1>;
+		i2c-bus = <&hub_1>;
+	};
+};
+
+&gem0 { /* SGMII over PS-GT lane 0, MDIO from GEM1 on MIO 50/51 */
+	phys = <&psgtr 0 8 0 0>; /* lane 0, PHY_TYPE_SGMII, instance 0, refclk 0 */
+	phy-handle = <&phy0>;
+	phy-mode = "sgmii";
+	is-internal-pcspma;
+	nvmem-cells = <&gem0_mac>;
+	nvmem-cell-names = "mac-address";
+};
+
+/*
+ * GEM1 is on EMIO with nothing connected, so that I2C0 can use MIO 42/43.  It
+ * stays enabled only for its MDIO controller on MIO 50/51, which is the only
+ * one pinned out.  A fixed link lets it probe without a PHY of its own.
+ */
+&gem1 {
+	phy-mode = "gmii";
+
+	fixed-link {
+		speed = <1000>;
+		full-duplex;
+	};
+
+	mdio: mdio {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		phy0: ethernet-phy@4 { /* DP83867, reset by U53 LM3880 */
+			#phy-cells = <1>;
+			compatible = "ethernet-phy-id2000.a231";
+			reg = <4>;
+			ti,rx-internal-delay = <0x8>; /* 2.25 ns */
+			ti,tx-internal-delay = <0xa>; /* 2.75 ns */
+			ti,fifo-depth = <0x1>; /* 4 nibbles */
+			ti,dp83867-rxctrl-strap-quirk;
+		};
+	};
+};
+
