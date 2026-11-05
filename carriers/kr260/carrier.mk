@@ -3,6 +3,7 @@
 # BOOT.BIN. AMD's KR260 board files and kit images are not used.
 # bd/kr260.tcl is FIM2's block design with the KR260's PS peripherals.
 
+SOM        := k26
 PART       := xck26-sfvc784-2LV-c
 BOARD_PART := xilinx.com:k26c:part0:2.0
 
@@ -10,7 +11,4 @@ BOARD_PART := xilinx.com:k26c:part0:2.0
 HAS_EMMC   := 1
 
 # User device tree, merged in this order by scripts/generate_sdt.sh
-DTSI       := som/k26/dts/k26-som.dtsi som/k26/dts/k26-emmc.dtsi carriers/kr260/dts/carrier.dtsi
-
-# Yocto machine generated from this carrier's SDT by gen-machine-conf
-MACHINE    ?= zynqmp-kr260-sdt
+DTSI       := som/$(SOM)/dts/k26-som.dtsi som/$(SOM)/dts/k26-emmc.dtsi carriers/kr260/dts/carrier.dtsi

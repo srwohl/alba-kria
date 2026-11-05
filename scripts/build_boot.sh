@@ -5,10 +5,9 @@ set -euo pipefail
 
 repo_dir=$(realpath "${1:?repository directory required}")
 bitbake=${2:-bitbake}
-machine=${3:-zynqmp-fim2-sdt}
-boot_config=${4:?boot configuration required}
+machine=${3:?machine required}
 # Empty on hosts that do not need the namespace-enabled AppArmor profile.
-apparmor_profile=${5-bitbake}
+apparmor_profile=${4-bitbake}
 yocto_dir="$repo_dir/build/yocto"
 
 fail() { printf 'Boot build: %s\n' "$*" >&2; exit 1; }
@@ -19,13 +18,14 @@ fail() { printf 'Boot build: %s\n' "$*" >&2; exit 1; }
     fail 'use a separate Yocto shell without Vivado/Vitis/PetaLinux settings.'
 [[ -s "$yocto_dir/conf/machine/$machine.conf" ]] || fail 'run make machine first.'
 command -v "$bitbake" >/dev/null || fail 'BitBake is not on PATH; initialize the Yocto environment first.'
-[[ -s "$boot_config" ]] || fail "boot configuration not found: $boot_config"
+grep -q '/meta-alba-kria ' "$yocto_dir/conf/bblayers.conf" ||
+    fail 'build/yocto was not created from meta-alba-kria; move it aside and run make setup.'
 # One Yocto build directory serves every carrier, so MACHINE must come from
 # the environment. A hard assignment in local.conf would silently override it.
 ! grep -Eq '^[[:space:]]*MACHINE[[:space:]]*=' "$yocto_dir/conf/local.conf" ||
     fail "conf/local.conf assigns MACHINE, which would override $machine; remove that line."
 
-cmd=(env MACHINE="$machine" "$bitbake" -R "$boot_config" xilinx-bootbin)
+cmd=(env MACHINE="$machine" "$bitbake" xilinx-bootbin)
 [[ -z "$apparmor_profile" ]] || cmd=(aa-exec -p "$apparmor_profile" -- "${cmd[@]}")
 cd "$yocto_dir"
 exec "${cmd[@]}"

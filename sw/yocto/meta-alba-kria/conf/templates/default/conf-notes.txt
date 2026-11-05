@@ -1,0 +1,10 @@
+
+### ALBA Kria build (meta-alba-kria on AMD EDF) ###
+
+Build from the repository with make, which passes MACHINE per carrier:
+    make CARRIER=fim2 machine boot
+    make CARRIER=kr260 machine boot
+
+By hand, MACHINE must be given on every command:
+    MACHINE=k26-fim2-sdt bitbake xilinx-bootbin
+

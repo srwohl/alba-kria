@@ -9,6 +9,8 @@ sync_jobs=${3:-4}
 release=${4:-amd-edf-rel-v26.06.1}
 manifest_url=https://github.com/Xilinx/yocto-manifests.git
 edf_dir="$repo_dir/build/edf"
+yocto_dir="$repo_dir/build/yocto"
+template_dir="$repo_dir/sw/yocto/meta-alba-kria/conf/templates/default"
 
 fail() { printf 'EDF setup: %s\n' "$*" >&2; exit 1; }
 
@@ -30,7 +32,19 @@ cd "$edf_dir"
 # Record all checked-out revisions for inspecting/reproducing this setup.
 "$repo_path" manifest -r -o "$repo_dir/build/edf-manifest.xml"
 
+# Create build/yocto/conf from our layer's templates (TEMPLATECONF). An
+# existing conf is never overwritten; check it came from the same templates.
+if [[ -e "$yocto_dir/conf" ]]; then
+    used=$(cat "$yocto_dir/conf/templateconf.cfg" 2>/dev/null || true)
+    [[ "$(realpath -m "$used")" == "$template_dir" ]] ||
+        fail "build/yocto/conf was created from ${used:-unknown templates}, not $template_dir; move build/yocto aside and run make setup again."
+else
+    TEMPLATECONF="$template_dir" bash -c '. "$1" "$2" >/dev/null' _ \
+        "$edf_dir/edf-init-build-env" "$yocto_dir"
+    [[ -s "$yocto_dir/conf/local.conf" ]] || fail "creating $yocto_dir/conf failed."
+fi
+
 printf '\nEDF %s sources ready. In this terminal, run:\n\n' "$release"
 # A child process cannot activate an environment in the parent terminal.
 printf 'source %q %q\n' "$edf_dir/edf-init-build-env" "$repo_dir/build/yocto"
-printf 'cd %q\nmake machine\n' "$repo_dir"
+printf 'cd %q\nmake CARRIER=<carrier> machine boot\n' "$repo_dir"

@@ -5,8 +5,9 @@
 # Prerequisites:
 #   1. Run make sdt in the Vivado environment (per carrier: CARRIER=<name>).
 #   2. In a NEW shell, run make setup to fetch the pinned EDF workspace.
-#   3. Run the source command it prints to initialize build/yocto and add
-#      the release's gen-machine-conf directory to PATH.
+#   3. Source the environment command it prints (build/yocto already exists,
+#      created from meta-alba-kria's templates); this also puts the release's
+#      gen-machine-conf on PATH.
 #   4. From this repository, run make machine.
 #
 # The Yocto environment/layers must already be configured: sourcing an
@@ -15,7 +16,7 @@ set -euo pipefail
 
 repo_dir=$(realpath "${1:?repository directory required}")
 generator=${2:-gen-machine-conf}
-machine=${3:-zynqmp-fim2-sdt}
+machine=${3:?machine required}
 tool_version=${4:-2026.1}
 # Per-carrier build directory holding sdt/; machine/ is written next to it.
 carrier_dir=$(realpath -m "${5:?carrier build directory required}")
@@ -35,7 +36,9 @@ fail() { printf 'Machine generation: %s\n' "$*" >&2; exit 1; }
 [[ "$(realpath "$BUILDDIR")" == "$yocto_dir" ]] ||
     fail "initialize the Yocto environment for $yocto_dir (current BUILDDIR is $BUILDDIR)."
 [[ -s "$yocto_dir/conf/bblayers.conf" && -s "$yocto_dir/conf/local.conf" ]] ||
-    fail "Yocto configuration missing under $yocto_dir/conf; configure the AMD 2026.1 workspace first."
+    fail "Yocto configuration missing under $yocto_dir/conf; run make setup first."
+grep -q '/meta-alba-kria ' "$yocto_dir/conf/bblayers.conf" ||
+    fail 'build/yocto was not created from meta-alba-kria; move it aside and run make setup.'
 command -v bitbake >/dev/null || fail 'bitbake is not on PATH; initialize the Yocto environment first.'
 generator_path=$(command -v "$generator") || fail "cannot find $generator; add the 2026.1 gen-machine-conf directory to PATH or set GEN_MACHINE_CONF."
 generator_path=$(realpath "$generator_path")
@@ -47,6 +50,9 @@ version=$("$generator_path" --version 2>&1) || fail "$version"
 version_re="Gen Machine Conf v${tool_version//./\\.}([^0-9.]|\$)"
 [[ "$version" =~ $version_re ]] ||
     fail "expected gen-machine-conf $tool_version, got: $version"
+# Start from scratch: gen-machine-conf keeps its settings in $output_dir and
+# ignores a changed --machine-name once that config exists (2026.1).
+rm -rf "$output_dir"
 mkdir -p "$output_dir"
 printf '%s\n' "$version" > "$output_dir/tool-version.txt"
 # No -l: it would append a hard MACHINE = "<machine>" to the shared
