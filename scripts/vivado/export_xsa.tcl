@@ -44,6 +44,9 @@ if {[catch {
     # No -include_bit: this first handoff does not run synthesis/implementation.
     write_hw_platform -fixed -force -file $xsa
     close_project
+
+    # The project now matches the Tcl; see export_bd.tcl.
+    close [open [file join $build_dir vivado .bd-synced] w]
 } message options]} {
     puts stderr "XSA export failed: $message"
     puts stderr [dict get $options -errorinfo]

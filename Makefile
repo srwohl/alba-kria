@@ -36,6 +36,8 @@ APPARMOR_PROFILE ?= bitbake
 IMAGE            ?=
 DRY_RUN          ?= 0
 HW_SERVER        ?=
+# FORCE=1 overrides the block design guards of xsa and bd-export.
+FORCE            ?= 0
 
 # ---- Sources and outputs
 CARRIER_DIR := carriers/$(CARRIER)
@@ -45,6 +47,11 @@ OUT         := $(BUILD)/$(CARRIER)
 LOGS        := $(OUT)/logs
 XSA         := $(OUT)/$(CARRIER).xsa
 SDT         := $(OUT)/sdt/.generated
+# Vivado project, rebuilt from BD_TCL by make xsa and opened by make gui.
+PROJECT     := $(OUT)/vivado/$(CARRIER).xpr
+PROJECT_BD  := $(OUT)/vivado/$(CARRIER).srcs/sources_1/bd/$(CARRIER)/$(CARRIER).bd
+# Touched whenever the project and BD_TCL match (after xsa and bd-export).
+BD_SYNCED   := $(OUT)/vivado/.bd-synced
 FLASH_TOOL  := $(BUILD)/tools/amd-flash-v8.0/.ready
 
 # $(call require,VAR,hint): fail early if the tool named by $(VAR) is missing.
@@ -52,7 +59,7 @@ require = @command -v "$($(1))" >/dev/null 2>&1 || { echo "$(1)=$($(1)) not foun
 
 .DEFAULT_GOAL := help
 .DELETE_ON_ERROR:
-.PHONY: help config xsa sdt setup machine boot flash-tool flash-qspi flash-emmc clean
+.PHONY: help config xsa sdt gui bd-export setup machine boot flash-tool flash-qspi flash-emmc clean
 
 ##@ General
 
@@ -74,8 +81,29 @@ config: ## Show the resolved carrier and tool settings
 xsa: $(XSA) ## Export hardware handoff to build/<carrier>/<carrier>.xsa
 sdt: $(SDT) ## Generate system device tree in build/<carrier>/sdt
 
+# Block design edits: make gui, edit and save, make bd-export, commit BD_TCL.
+# The project in build/ is disposable; BD_TCL in git is the source.
+gui: $(XSA) ## Open the carrier's Vivado project in the GUI
+	cd $(OUT) && nohup "$(VIVADO)" -mode gui -log logs/gui.log -journal logs/gui.jou \
+	    vivado/$(CARRIER).xpr >/dev/null 2>&1 &
+	@echo "Vivado is starting on $(PROJECT). After saving edits: make CARRIER=$(CARRIER) bd-export"
+
+bd-export: ## Write the saved GUI block design back to carriers/<carrier>/bd
+	$(call require,VIVADO,Source Vivado $(TOOL_VERSION) settings64.sh or set VIVADO=/path/to/vivado.)
+	@test -f $(PROJECT) || { echo "No project at $(PROJECT); run make gui first." >&2; exit 1; }
+	@if [ "$(FORCE)" != 1 ] && [ $(BD_TCL) -nt $(BD_SYNCED) ]; then \
+	    echo "$(BD_TCL) changed after the project was built; exporting would overwrite it." >&2; \
+	    echo "Rebuild with make xsa, or keep the project's design with FORCE=1." >&2; exit 1; fi
+	@mkdir -p $(LOGS)
+	cd $(OUT) && "$(VIVADO)" -mode batch -notrace -log logs/bd-export.log -journal logs/bd-export.jou \
+	    -source $(CURDIR)/scripts/vivado/export_bd.tcl -tclargs $(CURDIR)/$(PROJECT) $(CURDIR)/$(BD_TCL)
+	@git --no-pager diff --stat -- $(BD_TCL)
+
 $(XSA): $(BD_TCL) scripts/vivado/export_xsa.tcl project.mk $(CARRIER_DIR)/carrier.mk
 	$(call require,VIVADO,Source Vivado $(TOOL_VERSION) settings64.sh or set VIVADO=/path/to/vivado.)
+	@if [ "$(FORCE)" != 1 ] && [ -f $(PROJECT_BD) ] && [ $(PROJECT_BD) -nt $(BD_SYNCED) ]; then \
+	    echo "The block design in $(PROJECT) has edits not exported to $(BD_TCL)." >&2; \
+	    echo "Run make bd-export first, or discard them with FORCE=1." >&2; exit 1; fi
 	@mkdir -p $(LOGS)
 	cd $(OUT) && "$(VIVADO)" -mode batch -notrace -log logs/vivado.log -journal logs/vivado.jou \
 	    -source $(CURDIR)/scripts/vivado/export_xsa.tcl \
