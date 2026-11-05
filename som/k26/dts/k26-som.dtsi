@@ -1,0 +1,37 @@
+/*
+ * K26 SOM: devices on the SOM itself, common to every carrier and variant.
+ * Merged with the carrier's dts/carrier.dtsi by scripts/gen_sdt.sh.
+ * Binding constants are written as numbers, without C preprocessing.
+ */
+
+&qspi { /* MIO 0-5, on the SOM */
+	flash0: flash@0 { /* MT25QU512A */
+		compatible = "jedec,spi-nor"; /* 64MB */
+		reg = <0>;
+		spi-tx-bus-width = <4>;
+		spi-rx-bus-width = <4>;
+		spi-max-frequency = <40000000>; /* 40MHz */
+
+		/*
+		 * Development layout for the raw boot.bin programmed at QSPI
+		 * offset 0.  This is not the Kria Image Selector/A-B/recovery
+		 * layout.  scripts/flash.sh enforces the 2 MiB boot partition.
+		 */
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "Boot Image (FSBL, PMU, ATF, U-Boot)";
+				reg = <0x0 0x200000>; /* raw boot.bin, aligned to 2MB */
+				read-only;
+				lock;
+			};
+			partition@200000 {
+				label = "QSPI User";
+				reg = <0x200000 0x3e00000>; /* remainder of 64MB flash */
+			};
+		};
+	};
+};

@@ -3,7 +3,7 @@
 # https://edf.docs.amd.com/en/v26.06.1/shel/running-gen-machine-conf.html
 #
 # Prerequisites:
-#   1. Run make sdt in the Vivado environment.
+#   1. Run make sdt in the Vivado environment (per carrier: CARRIER=<name>).
 #   2. In a NEW shell, run make setup to fetch the pinned EDF workspace.
 #   3. Run the source command it prints to initialize build/yocto and add
 #      the release's gen-machine-conf directory to PATH.
@@ -17,9 +17,11 @@ repo_dir=$(realpath "${1:?repository directory required}")
 generator=${2:-gen-machine-conf}
 machine=${3:-zynqmp-fim2-sdt}
 tool_version=${4:-2026.1}
+# Per-carrier build directory holding sdt/; machine/ is written next to it.
+carrier_dir=$(realpath -m "${5:?carrier build directory required}")
 yocto_dir="$repo_dir/build/yocto"
-sdt_dir="$repo_dir/build/sdt"
-output_dir="$repo_dir/build/machine"
+sdt_dir="$carrier_dir/sdt"
+output_dir="$carrier_dir/machine"
 
 fail() { printf 'Machine generation: %s\n' "$*" >&2; exit 1; }
 

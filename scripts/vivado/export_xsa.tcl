@@ -1,9 +1,11 @@
-# Recreate the block design and export a hardware handoff without a bitstream.
+# Recreate a carrier's block design and export a hardware handoff without a
+# bitstream.
 #
 # vivado -mode batch -source export_xsa.tcl \
 #     -tclargs <part> <board_part> <tool_version> <bd_tcl> <output.xsa>
 #
-# Invoked by Make from build/; all paths must be absolute.
+# <bd_tcl> is carriers/<carrier>/bd/design_1.tcl. The Vivado project is
+# created next to the XSA, in vivado/. All paths must be absolute.
 if {[llength $argv] != 5} {
     puts stderr "usage: -tclargs <part> <board_part> <tool_version> <bd_tcl> <output.xsa>"
     exit 1
@@ -18,7 +20,7 @@ if {[catch {
         error "This design requires Vivado $tool_version (running [version -short])."
     }
 
-    create_project -force fim2 [file join $build_dir vivado] -part $part
+    create_project -force [file rootname [file tail $xsa]] [file join $build_dir vivado] -part $part
     set_property BOARD_PART $board_part [current_project]
 
     set result [source $bd_tcl]

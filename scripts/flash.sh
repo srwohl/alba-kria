@@ -24,7 +24,7 @@ args=(-d kria_k26 -pv -i "$image" -V)
 case "$medium" in
     qspi)
         [[ "${image,,}" == *.bin ]] || fail 'QSPI expects an uncompressed .bin boot image.'
-        # sw/dts/fim2.dtsi allocates [0, 0x200000) to the raw boot image.
+        # som/k26/dts/k26-som.dtsi allocates [0, 0x200000) to the raw boot image.
         (( $(stat -c %s "$image") <= 0x200000 )) || fail 'boot image exceeds the 2 MiB QSPI boot partition; review the flash layout first.'
         args+=(-a 0x0)
         ;;

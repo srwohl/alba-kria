@@ -1,0 +1,43 @@
+/*
+ * K26 production SOMs (K26C, K26I): eMMC on SD0, MIO 13-22.  The starter-kit
+ * SOMs (KV260, KR260) have no eMMC: only carriers with a production SOM list
+ * this file in DTSI (carriers/<name>/carrier.mk).
+ */
+
+/ {
+	aliases {
+		mmc0 = &sdhci0;
+	};
+};
+
+&pinctrl0 {
+	status = "okay";
+
+	pinctrl_sdhci0_default: sdhci0-default {
+		conf {
+			groups = "sdio0_0_grp";
+			slew-rate = <1>;
+			power-source = <1>;
+			bias-disable;
+		};
+
+		mux {
+			groups = "sdio0_0_grp";
+			function = "sdio0";
+		};
+	};
+};
+
+&sdhci0 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_sdhci0_default>;
+	non-removable;
+	disable-wp;
+	no-sd;
+	no-sdio;
+	cap-mmc-hw-reset;
+	bus-width = <8>;
+	xlnx,mio-bank = <0>;
+	assigned-clock-rates = <187498123>;
+};

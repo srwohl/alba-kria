@@ -1,6 +1,7 @@
 /*
- * FIM2 MainBoard with a K26 SOM. Included by SDTGen using -user_dts;
- * do not include system-top.dts here (it includes this file).
+ * FIM2 MainBoard carrier for the K26 SOM: everything reached through SOM240.
+ * SOM devices (QSPI, eMMC) live in som/k26/dts/; scripts/gen_sdt.sh merges
+ * them ahead of this file and passes the result to SDTGen as -user_dts.
  * Binding constants are written as numbers, without C preprocessing.
  *
  * Migrated from the 2024.2 board tree. Check labels and merged properties
@@ -13,7 +14,6 @@
 	/* SDTGen 2026.1 falls back to k26c-microblaze without a stock board DTS. */
 	compatible = "xlnx,zynqmp";
 	aliases {
-		mmc0 = &sdhci0;
 		ethernet0 = &gem0;
 		ethernet1 = &gem1;
 	};
@@ -38,8 +38,8 @@
  * clocks, so name them here.
  *
  * REFCLK0 is the 125 MHz Y8 and REFCLK1 the 27 MHz Y11, matching
- * CONFIG.PSU__GEM0__REF_CLK_SEL {Ref Clk0} and CONFIG.PSU__DP__REF_CLK_SEL
- * {Ref Clk1} in hw/bd/fim2_ps.tcl.  Keep them in step: psu_init programs the
+ * CONFIG.PSU__GEM0__REF_CLK_SEL and CONFIG.PSU__DP__REF_CLK_SEL in
+ * carriers/fim2/bd/design_1.tcl.  Keep them in step: psu_init programs the
  * SERDES from the block design, while Linux reprograms each lane from its
  * "phys" cells (below for GEM0, generated in pcw.dtsi for DisplayPort).
  *
@@ -53,38 +53,6 @@
 /* DP STC, audio and video clock rates, as on the KR260 */
 &zynqmp_dpsub {
 	assigned-clock-rates = <27000000>, <25000000>, <300000000>;
-};
-
-&qspi { /* MIO 0-5, on the SOM */
-	flash0: flash@0 { /* MT25QU512A */
-		compatible = "jedec,spi-nor"; /* 64MB */
-		reg = <0>;
-		spi-tx-bus-width = <4>;
-		spi-rx-bus-width = <4>;
-		spi-max-frequency = <40000000>; /* 40MHz */
-
-		/*
-		 * Development layout for the raw boot.bin programmed at QSPI
-		 * offset 0.  This is not the Kria Image Selector/A-B/recovery
-		 * layout.
-		 */
-		partitions {
-			compatible = "fixed-partitions";
-			#address-cells = <1>;
-			#size-cells = <1>;
-
-			partition@0 {
-				label = "Boot Image (FSBL, PMU, ATF, U-Boot)";
-				reg = <0x0 0x200000>; /* raw boot.bin, aligned to 2MB */
-				read-only;
-				lock;
-			};
-			partition@200000 {
-				label = "QSPI User";
-				reg = <0x200000 0x3e00000>; /* remainder of 64MB flash */
-			};
-		};
-	};
 };
 
 &pinctrl0 {
@@ -101,20 +69,6 @@
 			slew-rate = <1>;
 			drive-strength = <4>;
 			output-enable; /* Remove the boot firmware's MIO tri-state. */
-		};
-	};
-
-	pinctrl_sdhci0_default: sdhci0-default {
-		conf {
-			groups = "sdio0_0_grp";
-			slew-rate = <1>;
-			power-source = <1>;
-			bias-disable;
-		};
-
-		mux {
-			groups = "sdio0_0_grp";
-			function = "sdio0";
 		};
 	};
 };
@@ -140,20 +94,6 @@
 		"", "", "", "", "", "", "", "", /* 56..63 */
 		"", "", "", "", "", "", "", "", /* 64..71 */
 		"", "", "", "", "FIM2_USB_RESET_N"; /* 72..76 */
-};
-
-&sdhci0 { /* eMMC on the production SOM */
-	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_sdhci0_default>;
-	non-removable;
-	disable-wp;
-	no-sd;
-	no-sdio;
-	cap-mmc-hw-reset;
-	bus-width = <8>;
-	xlnx,mio-bank = <0>;
-	assigned-clock-rates = <187498123>;
 };
 
 /*
