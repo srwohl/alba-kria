@@ -6,7 +6,7 @@ set -euo pipefail
 repo_dir=$(realpath "${1:?repository directory required}")
 repo_tool=${2:-repo}
 sync_jobs=${3:-4}
-release=amd-edf-rel-v26.06.1
+release=${4:-amd-edf-rel-v26.06.1}
 manifest_url=https://github.com/Xilinx/yocto-manifests.git
 edf_dir="$repo_dir/build/edf"
 

@@ -16,6 +16,7 @@ set -euo pipefail
 repo_dir=$(realpath "${1:?repository directory required}")
 generator=${2:-gen-machine-conf}
 machine=${3:-zynqmp-fim2-sdt}
+tool_version=${4:-2026.1}
 yocto_dir="$repo_dir/build/yocto"
 sdt_dir="$repo_dir/build/sdt"
 output_dir="$repo_dir/build/machine"
@@ -41,8 +42,9 @@ generator_path=$(realpath "$generator_path")
 # also runs there, so any tool-created files stay under the ignored build/.
 cd "$yocto_dir"
 version=$("$generator_path" --version 2>&1) || fail "$version"
-[[ "$version" =~ Gen\ Machine\ Conf\ v2026\.1([^0-9.]|$) ]] ||
-    fail "expected gen-machine-conf 2026.1, got: $version"
+version_re="Gen Machine Conf v${tool_version//./\\.}([^0-9.]|\$)"
+[[ "$version" =~ $version_re ]] ||
+    fail "expected gen-machine-conf $tool_version, got: $version"
 mkdir -p "$output_dir"
 printf '%s\n' "$version" > "$output_dir/tool-version.txt"
 "$generator_path" parse-sdt \
