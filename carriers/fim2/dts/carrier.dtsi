@@ -30,6 +30,21 @@
 		clock-frequency = <27000000>;
 	};
 
+	/*
+	 * The DisplayPort connector. zynqmp-dpsub refuses to probe unless its
+	 * output port (port@5) leads somewhere.
+	 */
+	dpcon {
+		compatible = "dp-connector";
+		label = "DP";
+		type = "full-size";
+
+		port {
+			dpcon_in: endpoint {
+				remote-endpoint = <&dpsub_dp_out>;
+			};
+		};
+	};
 };
 
 /*
@@ -53,6 +68,14 @@
 /* DP STC, audio and video clock rates, as on the KR260 */
 &zynqmp_dpsub {
 	assigned-clock-rates = <27000000>, <25000000>, <300000000>;
+
+	ports {
+		out_dp: port@5 {
+			dpsub_dp_out: endpoint {
+				remote-endpoint = <&dpcon_in>;
+			};
+		};
+	};
 };
 
 &pinctrl0 {
