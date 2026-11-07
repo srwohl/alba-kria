@@ -367,3 +367,14 @@ SSTATE_DIR ?= "${TOPDIR}/../yocto-cache/sstate-cache"
 SKIP_META_VIRT_SANITY_CHECK = "1"
 SKIP_META_SECURITY_SANITY_CHECK = "1"
 SKIP_META_TPM_SANITY_CHECK = "1"
+
+# Target settings from meta-alba-kria; defaults live in its recipes:
+#   login user (recipes-core/images/edf-linux-disk-image.bbappend)
+#ALBA_USER = "alba"
+#ALBA_PASSWORD_HASH = "<openssl passwd -6 output, every $ written as \$>"
+#   static address instead of DHCP (recipes-core/systemd/systemd-conf_%.bbappend)
+#ALBA_STATIC_ADDRESS = "192.168.1.10/24"
+#ALBA_STATIC_GATEWAY = "192.168.1.1"
+#ALBA_STATIC_DNS = "192.168.1.1"
+#   kernel command line (recipes-core/systemd/systemd-bootconf-edf_%.bbappend)
+#ALBA_KERNEL_CMDLINE = "earlycon console=tty1 console=ttyPS0,115200 clk_ignore_unused cma=900M"
