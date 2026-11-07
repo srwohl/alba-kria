@@ -17,8 +17,8 @@ BD_NAME    := fim2_bd
 DTSI       := som/$(SOM)/dts/k26-som.dtsi som/$(SOM)/dts/k26-emmc.dtsi carriers/fim2/dts/carrier.dtsi
 
 # PL top level and constraints, built up during bring-up (hdl/README.md).
-# Layer 2: LED1 blinks from the 25 MHz board clock; the block design adds
-# the PS-to-PL AXI bus with an 8 KB BRAM at 0xA000_0000.
+# Layer 3: FIM2_HWInterface behind the PS-to-PL AXI bus and 8 KB BRAM.
 TOP         := fim2_top
-HDL_SOURCES := carriers/fim2/hdl/fim2_top.vhd
+HDL_SOURCES := carriers/fim2/hdl/fim2_top.vhd carriers/fim2/hdl/FIM2_HWInterface.vhd \
+               hdl/shift_reg_ctrl/shift_reg_ctrl.vhd
 XDC_SOURCES := carriers/fim2/xdc/fim2_top.xdc

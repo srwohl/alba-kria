@@ -43,6 +43,13 @@ if { [string first $scripts_vivado_version $current_vivado_version] == -1 } {
 # To test this script, run the following commands from Vivado Tcl console:
 # source fim2_bd_script.tcl
 
+
+# The design that will be created by this Tcl script contains the following 
+# module references:
+# FIM2_HWInterface
+
+# Please add the sources of those modules before sourcing this Tcl script.
+
 # If there is no project opened, this script will create a
 # project, but make sure you do not have an existing project
 # <./myproj/project_1.xpr> in the current working folder.
@@ -135,6 +142,7 @@ xilinx.com:ip:smartconnect:1.0\
 xilinx.com:ip:axi_bram_ctrl:4.1\
 xilinx.com:ip:blk_mem_gen:8.4\
 xilinx.com:ip:proc_sys_reset:5.0\
+xilinx.com:ip:xlconstant:1.1\
 "
 
    set list_ips_missing ""
@@ -152,6 +160,31 @@ xilinx.com:ip:proc_sys_reset:5.0\
       set bCheckIPsPassed 0
    }
 
+}
+
+##################################################################
+# CHECK Modules
+##################################################################
+set bCheckModules 1
+if { $bCheckModules == 1 } {
+   set list_check_mods "\ 
+FIM2_HWInterface\
+"
+
+   set list_mods_missing ""
+   common::send_gid_msg -ssname BD::TCL -id 2020 -severity "INFO" "Checking if the following modules exist in the project's sources: $list_check_mods ."
+
+   foreach mod_vlnv $list_check_mods {
+      if { [can_resolve_reference $mod_vlnv] == 0 } {
+         lappend list_mods_missing $mod_vlnv
+      }
+   }
+
+   if { $list_mods_missing ne "" } {
+      catch {common::send_gid_msg -ssname BD::TCL -id 2021 -severity "ERROR" "The following module(s) are not found in the project: $list_mods_missing" }
+      common::send_gid_msg -ssname BD::TCL -id 2022 -severity "INFO" "Please add source files for the missing module(s) above."
+      set bCheckIPsPassed 0
+   }
 }
 
 if { $bCheckIPsPassed != 1 } {
@@ -200,6 +233,17 @@ proc create_root_design { parentCell } {
   # Create interface ports
 
   # Create ports
+  set LPA_0 [ create_bd_port -dir IO -from 8 -to 0 LPA_0 ]
+  set LPB_0 [ create_bd_port -dir IO -from 8 -to 0 LPB_0 ]
+  set I2C_SCL_0 [ create_bd_port -dir O I2C_SCL_0 ]
+  set I2C_SDA_0 [ create_bd_port -dir IO I2C_SDA_0 ]
+  set LED1 [ create_bd_port -dir O -type data LED1 ]
+  set PMOD_0 [ create_bd_port -dir IO -from 8 -to 1 PMOD_0 ]
+  set hw_clk_25MHz [ create_bd_port -dir IO hw_clk_25MHz ]
+  set HPA_p_0 [ create_bd_port -dir IO -from 10 -to 0 HPA_p_0 ]
+  set HPA_n_0 [ create_bd_port -dir IO -from 10 -to 0 HPA_n_0 ]
+  set HPB_p_0 [ create_bd_port -dir IO -from 10 -to 0 HPB_p_0 ]
+  set HPB_n_0 [ create_bd_port -dir IO -from 10 -to 0 HPB_n_0 ]
 
   # Create instance: zynq_ultra_ps_e_0, and set properties
   set zynq_ultra_ps_e_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:zynq_ultra_ps_e:3.5 zynq_ultra_ps_e_0 ]
@@ -670,20 +714,66 @@ Port;FD4A0000;FD4AFFFF;1|FPD;DPDMA;FD4C0000;FD4CFFFF;1|FPD;DDR_XMPU5_CFG;FD05000
   # Create instance: proc_sys_reset_0, and set properties
   set proc_sys_reset_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 proc_sys_reset_0 ]
 
+  # Create instance: FIM2_HWInterface_0, and set properties
+  set block_name FIM2_HWInterface
+  set block_cell_name FIM2_HWInterface_0
+  if { [catch {set FIM2_HWInterface_0 [create_bd_cell -type module -reference $block_name $block_cell_name] } errmsg] } {
+     catch {common::send_gid_msg -ssname BD::TCL -id 2095 -severity "ERROR" "Unable to add referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
+     return 1
+   } elseif { $FIM2_HWInterface_0 eq "" } {
+     catch {common::send_gid_msg -ssname BD::TCL -id 2096 -severity "ERROR" "Unable to referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
+     return 1
+   }
+  
+  # Create instance: fim_o_0, and set properties
+  set fim_o_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 fim_o_0 ]
+  set_property -dict [list \
+    CONFIG.CONST_VAL {0} \
+    CONFIG.CONST_WIDTH {6} \
+  ] $fim_o_0
+
+
   # Create interface connections
   connect_bd_intf_net -intf_net axi_bram_ctrl_0_BRAM_PORTA [get_bd_intf_pins axi_bram_ctrl_0/BRAM_PORTA] [get_bd_intf_pins blk_mem_gen_0/BRAM_PORTA]
   connect_bd_intf_net -intf_net smartconnect_0_M00_AXI [get_bd_intf_pins smartconnect_0/M00_AXI] [get_bd_intf_pins axi_bram_ctrl_0/S_AXI]
   connect_bd_intf_net -intf_net zynq_ultra_ps_e_0_M_AXI_HPM0_FPD [get_bd_intf_pins zynq_ultra_ps_e_0/M_AXI_HPM0_FPD] [get_bd_intf_pins smartconnect_0/S00_AXI]
 
   # Create port connections
+  connect_bd_net -net FIM2_HWInterface_0_I2C_SCL  [get_bd_pins FIM2_HWInterface_0/I2C_SCL] \
+  [get_bd_ports I2C_SCL_0]
+  connect_bd_net -net FIM2_HWInterface_0_LED1  [get_bd_pins FIM2_HWInterface_0/LED1] \
+  [get_bd_ports LED1]
+  connect_bd_net -net Net  [get_bd_ports LPA_0] \
+  [get_bd_pins FIM2_HWInterface_0/LPA]
+  connect_bd_net -net Net1  [get_bd_ports LPB_0] \
+  [get_bd_pins FIM2_HWInterface_0/LPB]
+  connect_bd_net -net Net2  [get_bd_ports I2C_SDA_0] \
+  [get_bd_pins FIM2_HWInterface_0/I2C_SDA]
+  connect_bd_net -net Net3  [get_bd_ports PMOD_0] \
+  [get_bd_pins FIM2_HWInterface_0/PMOD]
+  connect_bd_net -net Net4  [get_bd_ports HPA_p_0] \
+  [get_bd_pins FIM2_HWInterface_0/HPA_p]
+  connect_bd_net -net Net5  [get_bd_ports HPA_n_0] \
+  [get_bd_pins FIM2_HWInterface_0/HPA_n]
+  connect_bd_net -net Net6  [get_bd_ports hw_clk_25MHz] \
+  [get_bd_pins FIM2_HWInterface_0/hw_clk_25MH]
+  connect_bd_net -net Net7  [get_bd_ports HPB_p_0] \
+  [get_bd_pins FIM2_HWInterface_0/HPB_p]
+  connect_bd_net -net Net8  [get_bd_ports HPB_n_0] \
+  [get_bd_pins FIM2_HWInterface_0/HPB_n]
+  connect_bd_net -net fim_o_0_dout  [get_bd_pins fim_o_0/dout] \
+  [get_bd_pins FIM2_HWInterface_0/FIM_o]
   connect_bd_net -net proc_sys_reset_0_peripheral_aresetn  [get_bd_pins proc_sys_reset_0/peripheral_aresetn] \
   [get_bd_pins smartconnect_0/aresetn] \
   [get_bd_pins axi_bram_ctrl_0/s_axi_aresetn]
+  connect_bd_net -net proc_sys_reset_0_peripheral_reset  [get_bd_pins proc_sys_reset_0/peripheral_reset] \
+  [get_bd_pins FIM2_HWInterface_0/reset]
   connect_bd_net -net zynq_ultra_ps_e_0_pl_clk0  [get_bd_pins zynq_ultra_ps_e_0/pl_clk0] \
   [get_bd_pins smartconnect_0/aclk] \
   [get_bd_pins axi_bram_ctrl_0/s_axi_aclk] \
   [get_bd_pins zynq_ultra_ps_e_0/maxihpm0_fpd_aclk] \
-  [get_bd_pins proc_sys_reset_0/slowest_sync_clk]
+  [get_bd_pins proc_sys_reset_0/slowest_sync_clk] \
+  [get_bd_pins FIM2_HWInterface_0/clk]
   connect_bd_net -net zynq_ultra_ps_e_0_pl_resetn0  [get_bd_pins zynq_ultra_ps_e_0/pl_resetn0] \
   [get_bd_pins proc_sys_reset_0/ext_reset_in]
 

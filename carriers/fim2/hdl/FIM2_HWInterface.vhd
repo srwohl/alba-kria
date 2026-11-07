@@ -202,11 +202,16 @@ begin
 
 
    SHR_data_out(15 downto 0) <= (others => '0');
-   SHR_data_out(16 downto 34) <= input_LEDS; -- input Front Panel LEDs
-   SHR_data_out(35 downto 40) <= FIM_o_i;     -- output Front Panel LEDs
+   -- Bring-up fix (not in the original): the original "16 downto 34" and
+   -- "35 downto 40" are empty ranges, which Vivado 2025.2 silently ignored
+   -- and 2026.1 rejects. Bit order assumed (input_LEDS(0) on bit 16); to be
+   -- confirmed against the front panel. Bits 44-47 were never driven.
+   SHR_data_out(34 downto 16) <= input_LEDS; -- input Front Panel LEDs
+   SHR_data_out(40 downto 35) <= FIM_o_i;     -- output Front Panel LEDs
    SHR_data_out(41) <= FIM_RST_ALRM_reg2;     -- RESET
    SHR_data_out(42) <= FIM_FPGA_RDY;     --  FPGA STATUS
    SHR_data_out(43) <= LED1_reg;     -- FPGA STATUS
+   SHR_data_out(47 downto 44) <= (others => '0');
 
    SHR_inst: shift_reg_ctrl
    generic map (
@@ -349,12 +354,17 @@ begin
        IB => HPA_n(2)  -- 1-bit input: Diff_n buffer input (connect directly to top-level port)
     );
 
-    Timming_IN1_IBUFDS_inst : IBUFDS  -- Timming
-    port map (
-       O => FIM_i_reg(13),   -- 1-bit output: Buffer output
-       I =>  HPA_p(4),   -- 1-bit input: Diff_p buffer input (connect directly to top-level port)
-       IB => HPA_n(4)  -- 1-bit input: Diff_n buffer input (connect directly to top-level port)
-    );
+    -- Bring-up fix (not in the original): RFDet3 above already has an IBUFDS
+    -- on HPA_p(4)/HPA_n(4), and a pin can only have one, so Vivado cannot place
+    -- this second one. Both signals still read that pin, as written. Which
+    -- input belongs on HPA(4) is to be confirmed.
+--    Timming_IN1_IBUFDS_inst : IBUFDS  -- Timming
+--    port map (
+--       O => FIM_i_reg(13),   -- 1-bit output: Buffer output
+--       I =>  HPA_p(4),   -- 1-bit input: Diff_p buffer input (connect directly to top-level port)
+--       IB => HPA_n(4)  -- 1-bit input: Diff_n buffer input (connect directly to top-level port)
+--    );
+    FIM_i_reg(13) <= FIM_i_reg(8);  -- Timming
 
     SPARE_IN1_IBUFDS_inst : IBUFDS  -- SPARE_IN1
     port map (
