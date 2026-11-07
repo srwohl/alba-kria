@@ -38,6 +38,8 @@ VIVADO_SETTINGS  ?=
 
 # ---- Options
 SYNC_JOBS        ?= 4
+# Parallel Vivado runs for make bit
+VIVADO_JOBS      ?= 4
 # Disk image recipe built by make image
 IMAGE_RECIPE     ?= edf-linux-disk-image
 # Set empty on hosts that do not need the namespace-enabled AppArmor profile.
@@ -60,10 +62,16 @@ BD_TCL      := $(CARRIER_DIR)/bd/$(BD_NAME).tcl
 # override HDL_SOURCES with an explicit list if it needs a different selection.
 HDL_DIRS    := $(wildcard hdl/ hdl/*/ $(CARRIER_DIR)/hdl/)
 HDL_SOURCES ?= $(sort $(foreach dir,$(HDL_DIRS),$(wildcard $(addprefix $(dir),*.vhd *.vhdl *.v *.sv))))
+# Carriers with PL logic set TOP (their hand-written top level) and
+# XDC_SOURCES in carrier.mk. Without TOP the block design's generated wrapper
+# is the top and there is no bitstream (PS only).
+TOP         ?=
+XDC_SOURCES ?=
 BUILD       := build
 OUT         := $(BUILD)/$(CARRIER)
 LOGS        := $(OUT)/logs
 XSA         := $(OUT)/$(CARRIER).xsa
+BIT         := $(OUT)/$(CARRIER).bit
 SDT         := $(OUT)/sdt/.generated
 # Vivado project, rebuilt from BD_TCL by make xsa and opened by make gui.
 PROJECT     := $(OUT)/vivado/$(CARRIER).xpr
@@ -92,7 +100,7 @@ require = @$(IN_VIVADO) sh -c 'command -v "$$1"' _ "$($(1))" >/dev/null 2>&1 || 
 
 .DEFAULT_GOAL := help
 .DELETE_ON_ERROR:
-.PHONY: help config xsa sdt gui bd-export setup machine boot image flash-tool flash-qspi flash-emmc clean
+.PHONY: help config xsa bit sdt gui bd-export setup machine boot image flash-tool flash-qspi flash-emmc clean
 
 ##@ General
 
@@ -107,11 +115,13 @@ help: ## Show this list
 config: ## Show the resolved carrier and tool settings
 	@printf '%-12s %s\n' CARRIER "$(CARRIER)" SOM "$(SOM)" PART "$(PART)" \
 	    BOARD_PART "$(BOARD_PART)" HAS_EMMC "$(HAS_EMMC)" MACHINE "$(MACHINE)" \
+	    BD_NAME "$(BD_NAME)" TOP "$(or $(TOP),(none: PS only))" \
 	    TOOL_VERSION "$(TOOL_VERSION)" EDF_RELEASE "$(EDF_RELEASE)" OUT "$(OUT)" DTSI "$(DTSI)"
 
 ##@ Hardware (Vivado)
 
 xsa: $(XSA) ## Export hardware handoff to build/<carrier>/<carrier>.xsa
+bit: $(BIT) ## Build the PL bitstream to build/<carrier>/<carrier>.bit
 sdt: $(SDT) ## Generate system device tree in build/<carrier>/sdt
 
 # Block design edits: make gui, edit and save, make bd-export, commit BD_TCL.
@@ -132,7 +142,7 @@ bd-export: ## Write the saved GUI block design back to carriers/<carrier>/bd
 	    -source $(CURDIR)/scripts/vivado/export_bd.tcl -tclargs $(CURDIR)/$(PROJECT) $(CURDIR)/$(BD_TCL)
 	@git --no-pager diff --stat -- $(BD_TCL)
 
-$(XSA): $(BD_TCL) $(HDL_SOURCES) $(HDL_DIRS) Makefile scripts/vivado/export_xsa.tcl project.mk $(CARRIER_DIR)/carrier.mk
+$(XSA): $(BD_TCL) $(HDL_SOURCES) $(XDC_SOURCES) $(HDL_DIRS) Makefile scripts/vivado/export_xsa.tcl project.mk $(CARRIER_DIR)/carrier.mk
 	$(call require,VIVADO,Source Vivado $(TOOL_VERSION) settings64.sh or set VIVADO=/path/to/vivado.)
 	@if [ "$(FORCE)" != 1 ] && [ -f $(PROJECT_BD) ] && [ $(PROJECT_BD) -nt $(BD_SYNCED) ]; then \
 	    echo "The block design in $(PROJECT) has edits not exported to $(BD_TCL)." >&2; \
@@ -140,8 +150,16 @@ $(XSA): $(BD_TCL) $(HDL_SOURCES) $(HDL_DIRS) Makefile scripts/vivado/export_xsa.
 	@mkdir -p $(LOGS)
 	cd $(OUT) && $(IN_VIVADO) "$(VIVADO)" -mode batch -notrace -log logs/vivado.log -journal logs/vivado.jou \
 	    -source $(CURDIR)/scripts/vivado/export_xsa.tcl \
-	    -tclargs $(PART) $(BOARD_PART) $(TOOL_VERSION) $(CURDIR)/$(BD_TCL) $(CURDIR)/$(XSA) \
-	    $(foreach source,$(HDL_SOURCES),"$(abspath $(source))")
+	    -tclargs $(PART) $(BOARD_PART) $(TOOL_VERSION) $(CURDIR)/$(BD_TCL) $(CURDIR)/$(XSA) "$(TOP)" \
+	    $(foreach source,$(HDL_SOURCES) $(XDC_SOURCES),"$(abspath $(source))")
+	@test -s $@ || { echo "Vivado did not produce $@" >&2; exit 1; }
+
+# Synthesis and implementation run in the project make xsa created, so
+# make gui shows the same runs and reports.
+$(BIT): $(XSA) scripts/vivado/build_bit.tcl
+	@test -n "$(TOP)" || { echo "Carrier $(CARRIER) has no PL logic (no TOP in carrier.mk)." >&2; exit 1; }
+	cd $(OUT) && $(IN_VIVADO) "$(VIVADO)" -mode batch -notrace -log logs/bit.log -journal logs/bit.jou \
+	    -source $(CURDIR)/scripts/vivado/build_bit.tcl -tclargs $(CURDIR)/$(PROJECT) $(CURDIR)/$@ $(VIVADO_JOBS)
 	@test -s $@ || { echo "Vivado did not produce $@" >&2; exit 1; }
 
 $(SDT): $(XSA) $(DTSI) scripts/generate_sdt.sh

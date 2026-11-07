@@ -31,20 +31,33 @@ that carrier. Set `HDL_SOURCES` in `carrier.mk` to select an explicit list.
 The files remain references to the originals in git. Loading sources does
 not by itself instantiate them; a block design does that.
 
-The FIM2 block design, `carriers/fim2/bd/fim2_bd.tcl`, is the original
-`kria_starter_kit` design rebuilt in Vivado 2026.1 on the repo's FIM2 PS
-settings, with `M_AXI_HPM0_FPD` (128-bit) enabled. It instantiates
-`FIM2_HWInterface` and `FIM2` (`C_INPUTS` = 20) as module references, in
-place of the original packaged `user.org:user:FIM2:3.5` IP, plus the
-original SmartConnect, 8 KB AXI BRAM and processor reset. Addresses: `FIM2_0`
-at 0xA001_0000 (64 KB), BRAM at 0xA000_0000 (8 KB). It is named `fim2_bd`
-(`BD_NAME` in `carrier.mk`) because VHDL names are case-insensitive: a
-design named `fim2` would generate an entity clashing with `FIM2`.
+The FIM2 PL design is being brought up in layers, one commit each:
 
-`make xsa` still uses the generated `fim2_bd_wrapper` as top and does not
-load `fim2.xdc` or run synthesis. The hand-written `som240_*` top level, the
-constraints and the bitstream are still to do. The KR260 block design is
-unchanged and PS-only.
+1. 25 MHz clock and LED1 (current): `carriers/fim2/hdl/fim2_top.vhd` blinks
+   LED1; the block design is PS only.
+2. PS-to-PL AXI: SmartConnect, processor reset and the 8 KB BRAM.
+3. Outputs: `FIM2_HWInterface`, shift register, PMOD debug pins.
+4. Inputs: single-ended `LPB` inputs, then the LVDS inputs and outputs.
+5. The `FIM2` AXI core in the signal path, with its device tree node.
+6. Loading the bitstream at boot.
+
+For each layer, `carrier.mk` lists the HDL (`HDL_SOURCES`) and constraints
+(`XDC_SOURCES`, in `carriers/fim2/xdc/fim2_top.xdc`) that are loaded, and
+`make CARRIER=fim2 bit` builds `build/fim2/fim2.bit`. The original
+`fim2.xdc` is kept as supplied and not loaded.
+
+The complete original design, rebuilt as a block design, is in commit
+456d3d4 (`carriers/fim2/bd/fim2_bd.tcl`): the original `kria_starter_kit`
+design on the repo's FIM2 PS settings with `M_AXI_HPM0_FPD` (128-bit)
+enabled, `FIM2_HWInterface` and `FIM2` (`C_INPUTS` = 20) as module
+references in place of the packaged `user.org:user:FIM2:3.5` IP,
+SmartConnect, 8 KB AXI BRAM and processor reset. Addresses: `FIM2_0` at
+0xA001_0000 (64 KB), BRAM at 0xA000_0000 (8 KB). Layers 2 to 5 bring it back
+piece by piece. The block design is named `fim2_bd` (`BD_NAME` in
+`carrier.mk`) because VHDL names are case-insensitive: a design named
+`fim2` would generate an entity clashing with `FIM2`.
+
+The KR260 block design is unchanged and PS-only.
 
 Earlier tests of the rewritten FIM2 implementation do not validate these
 unchanged originals.
@@ -53,9 +66,10 @@ Known problems in the carrier sources, left as supplied:
 
 - `ALBA_carrier_wrapper.vhd` does not parse: the port list has no closing
   `);`, and `kria_starter_kit` has no ports and is not the `fim2` block design.
-- `FIM2_HWInterface.vhd` analyzes but will not synthesize:
-  `SHR_data_out(16 downto 34)` and `(35 downto 40)` are null ranges
-  (`to` was meant), and bits 44 to 47 are never driven.
+- `FIM2_HWInterface.vhd`: `SHR_data_out(16 downto 34)` and `(35 downto 40)`
+  are null ranges, and bits 44 to 47 are never driven. Vivado 2025.2 ignores
+  the two assignments (`Synth 8-3919`), so no front-panel LED data is sent;
+  Vivado 2026.1 rejects them (`Synth 8-690`).
 - `HPA_p(4)`/`HPA_n(4)` feed both RFDet3 and Timming, so two IBUFDS share a pin.
 - The `FIM_i` and `FIM_RST_ALRM` outputs are never driven, and the `FIM_o` input
   is unused; `FIM_o_i` comes from inputs 16 downto 11 instead. In the block

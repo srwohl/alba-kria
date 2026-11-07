@@ -15,3 +15,9 @@ BD_NAME    := fim2_bd
 
 # User device tree, merged in this order by scripts/generate_sdt.sh
 DTSI       := som/$(SOM)/dts/k26-som.dtsi som/$(SOM)/dts/k26-emmc.dtsi carriers/fim2/dts/carrier.dtsi
+
+# PL top level and constraints, built up during bring-up. Layer 1: LED1
+# blinks from the 25 MHz board clock; the block design is PS only.
+TOP         := fim2_top
+HDL_SOURCES := carriers/fim2/hdl/fim2_top.vhd
+XDC_SOURCES := carriers/fim2/xdc/fim2_top.xdc
