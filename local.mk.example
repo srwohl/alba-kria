@@ -1,3 +1,5 @@
 # Per-host settings: copy to local.mk (not in git) and adjust.
 # Vivado 2026.1 settings, sourced by make for the Vivado targets.
 VIVADO_SETTINGS := $(HOME)/tools/Xilinx/Vivado/2026.1/Vivado/settings64.sh
+# make load: SSH login on the running board (key login avoids two password prompts).
+#BOARD_HOST := alba@192.168.1.10

@@ -67,9 +67,10 @@ For each layer, `carrier.mk` lists the HDL (`HDL_SOURCES`) and constraints
 (`XDC_SOURCES`, in `carriers/fim2/xdc/fim2_top.xdc`) that are loaded, and
 `make CARRIER=fim2 bit` builds `build/fim2/fim2.bit` and `fim2.bit.bin`.
 From layer 2 on, load `fim2.bit.bin` from Linux through the FPGA manager,
-not over JTAG: BOOT.BIN has no bitstream, so its FSBL leaves the PS-PL
-interfaces isolated and the PL in reset, and only a PMU firmware load
-(the FPGA manager) releases them. The original
+`make CARRIER=fim2 load BOARD_HOST=alba@<address>` (set `BOARD_HOST` in
+`local.mk`), not over JTAG: BOOT.BIN has no bitstream, so its FSBL leaves
+the PS-PL interfaces isolated and the PL in reset, and only a PMU firmware
+load (the FPGA manager) releases them. The original
 `fim2.xdc` is kept as supplied and not loaded.
 
 The complete original design, rebuilt as a block design, is in commit

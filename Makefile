@@ -50,6 +50,8 @@ APPARMOR_PROFILE ?= bitbake
 IMAGE            ?=
 DRY_RUN          ?= 0
 HW_SERVER        ?=
+# make load: SSH login on the running board, e.g. alba@192.168.1.10
+BOARD_HOST       ?=
 # FORCE=1 overrides the block design guards of xsa and bd-export.
 FORCE            ?= 0
 
@@ -101,7 +103,7 @@ require = @$(IN_VIVADO) sh -c 'command -v "$$1"' _ "$($(1))" >/dev/null 2>&1 || 
 
 .DEFAULT_GOAL := help
 .DELETE_ON_ERROR:
-.PHONY: help config xsa bit sdt gui bd-export setup machine boot image flash-tool flash-qspi flash-emmc clean
+.PHONY: help config xsa bit sdt gui bd-export setup machine boot image load flash-tool flash-qspi flash-emmc clean
 
 ##@ General
 
@@ -185,8 +187,11 @@ boot: ## Build BOOT.BIN (xilinx-bootbin)
 image: ## Build the eMMC disk image (.wic.gz): IMAGE_RECIPE=edf-linux-disk-image
 	$(IN_YOCTO) bash scripts/build_yocto.sh "$(CURDIR)" "$(BITBAKE)" "$(MACHINE)" "$(APPARMOR_PROFILE)" "$(IMAGE_RECIPE)"
 
-##@ Programming (Vivado; DRY_RUN=1 never touches hardware)
+##@ Programming (DRY_RUN=1 never touches hardware)
 
+# Loads the last make bit output; it never starts a build.
+load: ## Load the bitstream into a running board's PL over SSH: BOARD_HOST=user@host
+	bash scripts/load_pl.sh "$(BIT).bin" "$(BOARD_HOST)" "$(DRY_RUN)"
 flash-tool: $(FLASH_TOOL) ## Download and verify the AMD flash tool v8.0
 flash-qspi: $(FLASH_TOOL) ## Write BOOT.BIN to QSPI (default: latest build)
 	$(IN_VIVADO) bash scripts/flash.sh "$(CURDIR)" qspi "$(or $(IMAGE),$(DEPLOY)/BOOT-$(MACHINE).bin)" "$(XSDB)" "$(DRY_RUN)" "$(HW_SERVER)"
