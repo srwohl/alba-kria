@@ -46,7 +46,7 @@ if { [string first $scripts_vivado_version $current_vivado_version] == -1 } {
 
 # The design that will be created by this Tcl script contains the following 
 # module references:
-# FIM2_HWInterface
+# FIM2_HWInterface, FIM2
 
 # Please add the sources of those modules before sourcing this Tcl script.
 
@@ -142,7 +142,6 @@ xilinx.com:ip:smartconnect:1.0\
 xilinx.com:ip:axi_bram_ctrl:4.1\
 xilinx.com:ip:blk_mem_gen:8.4\
 xilinx.com:ip:proc_sys_reset:5.0\
-xilinx.com:ip:xlconstant:1.1\
 "
 
    set list_ips_missing ""
@@ -169,6 +168,7 @@ set bCheckModules 1
 if { $bCheckModules == 1 } {
    set list_check_mods "\ 
 FIM2_HWInterface\
+FIM2\
 "
 
    set list_mods_missing ""
@@ -695,7 +695,7 @@ Port;FD4A0000;FD4AFFFF;1|FPD;DPDMA;FD4C0000;FD4CFFFF;1|FPD;DDR_XMPU5_CFG;FD05000
   # Create instance: smartconnect_0, and set properties
   set smartconnect_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:smartconnect:1.0 smartconnect_0 ]
   set_property -dict [list \
-    CONFIG.NUM_MI {1} \
+    CONFIG.NUM_MI {2} \
     CONFIG.NUM_SI {1} \
   ] $smartconnect_0
 
@@ -725,20 +725,34 @@ Port;FD4A0000;FD4AFFFF;1|FPD;DPDMA;FD4C0000;FD4CFFFF;1|FPD;DDR_XMPU5_CFG;FD05000
      return 1
    }
   
-  # Create instance: fim_o_0, and set properties
-  set fim_o_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 fim_o_0 ]
-  set_property -dict [list \
-    CONFIG.CONST_VAL {0} \
-    CONFIG.CONST_WIDTH {6} \
-  ] $fim_o_0
+  # Create instance: FIM2_0, and set properties
+  set block_name FIM2
+  set block_cell_name FIM2_0
+  if { [catch {set FIM2_0 [create_bd_cell -type module -reference $block_name $block_cell_name] } errmsg] } {
+     catch {common::send_gid_msg -ssname BD::TCL -id 2095 -severity "ERROR" "Unable to add referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
+     return 1
+   } elseif { $FIM2_0 eq "" } {
+     catch {common::send_gid_msg -ssname BD::TCL -id 2096 -severity "ERROR" "Unable to referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
+     return 1
+   }
+    set_property CONFIG.C_INPUTS {20} $FIM2_0
 
 
   # Create interface connections
   connect_bd_intf_net -intf_net axi_bram_ctrl_0_BRAM_PORTA [get_bd_intf_pins axi_bram_ctrl_0/BRAM_PORTA] [get_bd_intf_pins blk_mem_gen_0/BRAM_PORTA]
-  connect_bd_intf_net -intf_net smartconnect_0_M00_AXI [get_bd_intf_pins smartconnect_0/M00_AXI] [get_bd_intf_pins axi_bram_ctrl_0/S_AXI]
+  connect_bd_intf_net -intf_net smartconnect_0_M00_AXI [get_bd_intf_pins smartconnect_0/M00_AXI] [get_bd_intf_pins FIM2_0/s00_axi]
+  connect_bd_intf_net -intf_net smartconnect_0_M01_AXI [get_bd_intf_pins smartconnect_0/M01_AXI] [get_bd_intf_pins axi_bram_ctrl_0/S_AXI]
   connect_bd_intf_net -intf_net zynq_ultra_ps_e_0_M_AXI_HPM0_FPD [get_bd_intf_pins zynq_ultra_ps_e_0/M_AXI_HPM0_FPD] [get_bd_intf_pins smartconnect_0/S00_AXI]
 
   # Create port connections
+  connect_bd_net -net FIM2_0_FIM_o  [get_bd_pins FIM2_0/FIM_o] \
+  [get_bd_pins FIM2_HWInterface_0/FIM_o]
+  connect_bd_net -net FIM2_HWInterface_0_FIM_RST_ALRM  [get_bd_pins FIM2_HWInterface_0/FIM_RST_ALRM] \
+  [get_bd_pins FIM2_0/Manual_RST]
+  connect_bd_net -net FIM2_HWInterface_0_FIM_SW  [get_bd_pins FIM2_HWInterface_0/FIM_SW] \
+  [get_bd_pins FIM2_0/disableSW]
+  connect_bd_net -net FIM2_HWInterface_0_FIM_i  [get_bd_pins FIM2_HWInterface_0/FIM_i] \
+  [get_bd_pins FIM2_0/FIM_i]
   connect_bd_net -net FIM2_HWInterface_0_I2C_SCL  [get_bd_pins FIM2_HWInterface_0/I2C_SCL] \
   [get_bd_ports I2C_SCL_0]
   connect_bd_net -net FIM2_HWInterface_0_LED1  [get_bd_pins FIM2_HWInterface_0/LED1] \
@@ -761,11 +775,10 @@ Port;FD4A0000;FD4AFFFF;1|FPD;DPDMA;FD4C0000;FD4CFFFF;1|FPD;DDR_XMPU5_CFG;FD05000
   [get_bd_pins FIM2_HWInterface_0/HPB_p]
   connect_bd_net -net Net8  [get_bd_ports HPB_n_0] \
   [get_bd_pins FIM2_HWInterface_0/HPB_n]
-  connect_bd_net -net fim_o_0_dout  [get_bd_pins fim_o_0/dout] \
-  [get_bd_pins FIM2_HWInterface_0/FIM_o]
   connect_bd_net -net proc_sys_reset_0_peripheral_aresetn  [get_bd_pins proc_sys_reset_0/peripheral_aresetn] \
   [get_bd_pins smartconnect_0/aresetn] \
-  [get_bd_pins axi_bram_ctrl_0/s_axi_aresetn]
+  [get_bd_pins axi_bram_ctrl_0/s_axi_aresetn] \
+  [get_bd_pins FIM2_0/s00_axi_aresetn]
   connect_bd_net -net proc_sys_reset_0_peripheral_reset  [get_bd_pins proc_sys_reset_0/peripheral_reset] \
   [get_bd_pins FIM2_HWInterface_0/reset]
   connect_bd_net -net zynq_ultra_ps_e_0_pl_clk0  [get_bd_pins zynq_ultra_ps_e_0/pl_clk0] \
@@ -773,11 +786,13 @@ Port;FD4A0000;FD4AFFFF;1|FPD;DPDMA;FD4C0000;FD4CFFFF;1|FPD;DDR_XMPU5_CFG;FD05000
   [get_bd_pins axi_bram_ctrl_0/s_axi_aclk] \
   [get_bd_pins zynq_ultra_ps_e_0/maxihpm0_fpd_aclk] \
   [get_bd_pins proc_sys_reset_0/slowest_sync_clk] \
+  [get_bd_pins FIM2_0/s00_axi_aclk] \
   [get_bd_pins FIM2_HWInterface_0/clk]
   connect_bd_net -net zynq_ultra_ps_e_0_pl_resetn0  [get_bd_pins zynq_ultra_ps_e_0/pl_resetn0] \
   [get_bd_pins proc_sys_reset_0/ext_reset_in]
 
   # Create address segments
+  assign_bd_address -offset 0xA0010000 -range 0x00010000 -target_address_space [get_bd_addr_spaces zynq_ultra_ps_e_0/Data] [get_bd_addr_segs FIM2_0/s00_axi/reg0] -force
   assign_bd_address -offset 0xA0000000 -range 0x00002000 -target_address_space [get_bd_addr_spaces zynq_ultra_ps_e_0/Data] [get_bd_addr_segs axi_bram_ctrl_0/S_AXI/Mem0] -force
 
 

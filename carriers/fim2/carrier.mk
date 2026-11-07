@@ -17,8 +17,9 @@ BD_NAME    := fim2_bd
 DTSI       := som/$(SOM)/dts/k26-som.dtsi som/$(SOM)/dts/k26-emmc.dtsi carriers/fim2/dts/carrier.dtsi
 
 # PL top level and constraints, built up during bring-up (hdl/README.md).
-# Layer 3: FIM2_HWInterface behind the PS-to-PL AXI bus and 8 KB BRAM.
+# Layer 4: the original block design, with the FIM2 AXI core at 0xA001_0000.
 TOP         := fim2_top
 HDL_SOURCES := carriers/fim2/hdl/fim2_top.vhd carriers/fim2/hdl/FIM2_HWInterface.vhd \
-               hdl/shift_reg_ctrl/shift_reg_ctrl.vhd
+               hdl/shift_reg_ctrl/shift_reg_ctrl.vhd \
+               hdl/fim2/FIM2.vhd hdl/fim2/FIM2_slave_lite_v3_5_S00_AXI.vhd
 XDC_SOURCES := carriers/fim2/xdc/fim2_top.xdc

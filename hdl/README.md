@@ -30,8 +30,7 @@ Changes to the originals, each marked "Bring-up fix" in the file:
 
 Bring-up changes outside the sources: the block design drives
 `FIM2_HWInterface.reset` from `peripheral_reset` (active high) instead of the
-original `peripheral_aresetn`, and ties its unused `FIM_o` input to 0 until
-`FIM2_0` returns.
+original `peripheral_aresetn`.
 
 These files were recovered directly from the original code pasted into
 this conversation and checked byte-for-byte against that text. For the
@@ -54,11 +53,17 @@ commit each:
    the block design is PS only. Tested on the board.
 2. PS-to-PL AXI: `M_AXI_HPM0_FPD`, SmartConnect, processor reset and the
    8 KB BRAM at 0xA000_0000, as in the original design. Tested on the board.
-3. `FIM2_HWInterface` (current) on the 62 pins it uses, inputs and outputs;
+3. `FIM2_HWInterface` on the 62 pins it uses, inputs and outputs;
    `fim2_top` connects them in its port map with the original wrapper's
    mapping. Builds. To test on the board: LED1, shift register, PMOD debug
    pins, the `LPB` inputs, and the LVDS inputs and outputs.
-4. The `FIM2` AXI core at 0xA001_0000, in the signal path.
+4. The `FIM2` AXI core (current) at 0xA001_0000 (64 KB, 32 registers),
+   wired as in the original block design. The block design now matches the
+   original except for the reset fix. As in the original, `FIM2` is not in
+   the signal path: `FIM2_HWInterface` leaves `FIM_i` undriven and ignores
+   `FIM_o`. Tested on the board after `make load`: 0x00 and 0x04 read
+   0xA1BA0000 and 0xF1320000, and 0x34 reads back what is written. The mask
+   registers do not, because of a bug in `FIM2` (see below).
 5. Linux access: a UIO overlay for the BRAM and the FIM2 registers, and a
    test program.
 6. Loading the bitstream at boot.
@@ -145,6 +150,15 @@ Known problems in the carrier sources, left as supplied:
 - `fim2.xdc` has no `create_clock`. 18 wrapper ports sit on bank 224 GT pins,
   which cannot be used as plain I/O, and 94 wrapper ports in banks 44, 64 and 65
   have no `IOSTANDARD`. Its `"No Connect"`/`RSV_FPGA_*` lines match no ports.
+- `FIM2_slave_lite_v3_5_S00_AXI.vhd` drives `mask_reg` twice: the clocked
+  reset (lines 256-261) and the concurrent copies of `slv_reg4`-`9`
+  (lines 673-678). Vivado keeps the constant 0 (`Synth 8-6858`/`8-6859`,
+  about 200 critical warnings in the `FIM2_0` synthesis). The tied net is
+  also bits 0-19 of `slv_reg4`-`9`, so those bits of the six mask registers
+  (0x10-0x24) cannot be written and read 0; bits 20-31 work. Every output
+  mask is 0 and `FIM_o` stays 0. Seen on the board: 0x00012345 written to
+  0x10 reads 0, and 0xFFFFFFFF reads 0xFFF00000. No effect on the pins while
+  `FIM2` is not in the signal path.
 - `kria_starter_kit_wrapper.vhd` writes every pin as `som240_x <= signal`,
   including the 20 inputs (14 LVDS pairs and 6 single-ended), so no input
   except the 25 MHz clock reaches the logic. It declares all 203 `som240_*`
@@ -188,7 +202,8 @@ LPB), reverse the pin order: MainBoard pin n mates with RearBoard pin 51-n.
   the original block design sets `C_INPUTS` to 20: 20 switches, of which the
   18 inputs use the first 18.
 
-Open questions for the design owner: Timing on HPB(3); whether `FIM2` should
+Open questions for the design owner: the `mask_reg` double driver in `FIM2`
+(see Known problems); Timing on HPB(3); whether `FIM2` should
 drive the outputs (today they follow inputs 11-16 directly); what the
 `Manual_RST` port of `FIM2` is for, since `Reset_Alarm` is only used
 in `FIM2_HWInterface`; and the labels of the six Output LEDs, which are not
