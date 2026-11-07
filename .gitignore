@@ -1,3 +1,5 @@
 /build/
 /.Xil/
 /local.mk
+__pycache__/
+*.pyc
