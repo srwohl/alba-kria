@@ -54,7 +54,7 @@
  *
  * REFCLK0 is the 125 MHz Y8 and REFCLK1 the 27 MHz Y11, matching
  * CONFIG.PSU__GEM0__REF_CLK_SEL and CONFIG.PSU__DP__REF_CLK_SEL in
- * carriers/fim2/bd/fim2.tcl.  Keep them in step: psu_init programs the
+ * carriers/fim2/bd/fim2_bd.tcl.  Keep them in step: psu_init programs the
  * SERDES from the block design, while Linux reprograms each lane from its
  * "phys" cells (below for GEM0, generated in pcw.dtsi for DisplayPort).
  *

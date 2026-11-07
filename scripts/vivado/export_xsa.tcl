@@ -2,16 +2,17 @@
 # bitstream.
 #
 # vivado -mode batch -source export_xsa.tcl \
-#     -tclargs <part> <board_part> <tool_version> <bd_tcl> <output.xsa>
+#     -tclargs <part> <board_part> <tool_version> <bd_tcl> <output.xsa> [hdl_source ...]
 #
-# <bd_tcl> is carriers/<carrier>/bd/<carrier>.tcl, which creates the block
+# <bd_tcl> is carriers/<carrier>/bd/<bd_name>.tcl, which creates the block
 # design of the same name. The Vivado project is created next to the XSA,
 # in vivado/. All paths must be absolute.
-if {[llength $argv] != 5} {
-    puts stderr "usage: -tclargs <part> <board_part> <tool_version> <bd_tcl> <output.xsa>"
+if {[llength $argv] < 5} {
+    puts stderr "usage: -tclargs <part> <board_part> <tool_version> <bd_tcl> <output.xsa> \[hdl_source ...\]"
     exit 1
 }
 lassign $argv part board_part tool_version bd_tcl xsa
+set hdl_sources [lrange $argv 5 end]
 set build_dir [file dirname $xsa]
 set bd_name [file rootname [file tail $bd_tcl]]
 
@@ -24,6 +25,20 @@ if {[catch {
 
     create_project -force [file rootname [file tail $xsa]] [file join $build_dir vivado] -part $part
     set_property BOARD_PART $board_part [current_project]
+    set_property source_mgmt_mode All [current_project]
+
+    # Module references must be available before the block design is sourced.
+    # Keep the original files in git as project sources; do not import copies
+    # into the disposable build directory.
+    if {[llength $hdl_sources] != 0} {
+        foreach source $hdl_sources {
+            if {![file isfile $source]} {
+                error "HDL source does not exist: $source"
+            }
+        }
+        add_files -norecurse $hdl_sources
+        update_compile_order -fileset sources_1
+    }
 
     set result [source $bd_tcl]
     if {[string is integer -strict $result] && $result != 0} {

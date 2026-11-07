@@ -9,6 +9,7 @@
 # A build is one SOM + carrier combination: make CARRIER=<name> <target>.
 #   carriers/<name>/    block design, device tree, part and machine for one combo
 #   som/k26/            device tree for what is on the SOM itself, shared
+#   hdl/<module>/       reusable HDL, loaded into every carrier's project
 #   sw/                 shared by every carrier
 # The logic lives in scripts/; this file only wires stages together.
 
@@ -51,7 +52,14 @@ FORCE            ?= 0
 
 # ---- Sources and outputs
 CARRIER_DIR := carriers/$(CARRIER)
-BD_TCL      := $(CARRIER_DIR)/bd/$(CARRIER).tcl
+# Block design name; carrier.mk sets BD_NAME when the carrier's own name
+# would clash with an HDL entity.
+BD_NAME     ?= $(CARRIER)
+BD_TCL      := $(CARRIER_DIR)/bd/$(BD_NAME).tcl
+# Shared modules and optional carrier-specific HDL. Carrier configuration can
+# override HDL_SOURCES with an explicit list if it needs a different selection.
+HDL_DIRS    := $(wildcard hdl/ hdl/*/ $(CARRIER_DIR)/hdl/)
+HDL_SOURCES ?= $(sort $(foreach dir,$(HDL_DIRS),$(wildcard $(addprefix $(dir),*.vhd *.vhdl *.v *.sv))))
 BUILD       := build
 OUT         := $(BUILD)/$(CARRIER)
 LOGS        := $(OUT)/logs
@@ -59,7 +67,7 @@ XSA         := $(OUT)/$(CARRIER).xsa
 SDT         := $(OUT)/sdt/.generated
 # Vivado project, rebuilt from BD_TCL by make xsa and opened by make gui.
 PROJECT     := $(OUT)/vivado/$(CARRIER).xpr
-PROJECT_BD  := $(OUT)/vivado/$(CARRIER).srcs/sources_1/bd/$(CARRIER)/$(CARRIER).bd
+PROJECT_BD  := $(OUT)/vivado/$(CARRIER).srcs/sources_1/bd/$(BD_NAME)/$(BD_NAME).bd
 # Touched whenever the project and BD_TCL match (after xsa and bd-export).
 BD_SYNCED   := $(OUT)/vivado/.bd-synced
 FLASH_TOOL  := $(BUILD)/tools/amd-flash-v8.0/.ready
@@ -124,7 +132,7 @@ bd-export: ## Write the saved GUI block design back to carriers/<carrier>/bd
 	    -source $(CURDIR)/scripts/vivado/export_bd.tcl -tclargs $(CURDIR)/$(PROJECT) $(CURDIR)/$(BD_TCL)
 	@git --no-pager diff --stat -- $(BD_TCL)
 
-$(XSA): $(BD_TCL) Makefile scripts/vivado/export_xsa.tcl project.mk $(CARRIER_DIR)/carrier.mk
+$(XSA): $(BD_TCL) $(HDL_SOURCES) $(HDL_DIRS) Makefile scripts/vivado/export_xsa.tcl project.mk $(CARRIER_DIR)/carrier.mk
 	$(call require,VIVADO,Source Vivado $(TOOL_VERSION) settings64.sh or set VIVADO=/path/to/vivado.)
 	@if [ "$(FORCE)" != 1 ] && [ -f $(PROJECT_BD) ] && [ $(PROJECT_BD) -nt $(BD_SYNCED) ]; then \
 	    echo "The block design in $(PROJECT) has edits not exported to $(BD_TCL)." >&2; \
@@ -132,7 +140,8 @@ $(XSA): $(BD_TCL) Makefile scripts/vivado/export_xsa.tcl project.mk $(CARRIER_DI
 	@mkdir -p $(LOGS)
 	cd $(OUT) && $(IN_VIVADO) "$(VIVADO)" -mode batch -notrace -log logs/vivado.log -journal logs/vivado.jou \
 	    -source $(CURDIR)/scripts/vivado/export_xsa.tcl \
-	    -tclargs $(PART) $(BOARD_PART) $(TOOL_VERSION) $(CURDIR)/$(BD_TCL) $(CURDIR)/$(XSA)
+	    -tclargs $(PART) $(BOARD_PART) $(TOOL_VERSION) $(CURDIR)/$(BD_TCL) $(CURDIR)/$(XSA) \
+	    $(foreach source,$(HDL_SOURCES),"$(abspath $(source))")
 	@test -s $@ || { echo "Vivado did not produce $@" >&2; exit 1; }
 
 $(SDT): $(XSA) $(DTSI) scripts/generate_sdt.sh

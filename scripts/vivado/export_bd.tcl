@@ -1,5 +1,6 @@
-# Write a carrier's block design back to carriers/<carrier>/bd/<carrier>.tcl
-# after editing it in the Vivado GUI.
+# Write a carrier's block design back to carriers/<carrier>/bd/<bd_name>.tcl
+# after editing it in the Vivado GUI. <bd_name> is the carrier name unless
+# its carrier.mk sets BD_NAME.
 #
 # From make (batch, opens the saved project):
 #   vivado -mode batch -source export_bd.tcl -tclargs <project.xpr> <bd_tcl>
@@ -8,8 +9,8 @@
 # Either way the design is validated and saved first, so in the GUI unsaved
 # edits are included.
 #
-# The project and block design are named after the carrier, so the output
-# path follows from the project name. All paths must be absolute.
+# The project is named after the carrier and holds one block design, so the
+# output path follows from those names. All paths must be absolute.
 set repo_dir [file normalize [file join [file dirname [info script]] .. ..]]
 
 proc export_bd {repo_dir bd_tcl} {
@@ -35,7 +36,12 @@ proc export_bd {repo_dir bd_tcl} {
 
 if {$::rdi::mode eq "gui"} {
     set carrier [get_property NAME [current_project]]
-    export_bd $repo_dir [file join $repo_dir carriers $carrier bd $carrier.tcl]
+    set bd_files [get_files -quiet *.bd]
+    if {[llength $bd_files] != 1} {
+        error "Expected exactly one block design in project $carrier."
+    }
+    set bd_name [file rootname [file tail [lindex $bd_files 0]]]
+    export_bd $repo_dir [file join $repo_dir carriers $carrier bd $bd_name.tcl]
     return
 }
 
