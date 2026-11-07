@@ -1,0 +1,3 @@
+# Per-host settings: copy to local.mk (not in git) and adjust.
+# Vivado 2026.1 settings, sourced by make for the Vivado targets.
+VIVADO_SETTINGS := $(HOME)/tools/Xilinx/Vivado/2026.1/Vivado/settings64.sh
