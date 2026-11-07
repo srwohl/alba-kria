@@ -20,12 +20,13 @@ belong in separate wrappers, project configuration or build scripts.
 Changes to the originals, each marked "Bring-up fix" in the file:
 
 - `FIM2_HWInterface.vhd`: `SHR_data_out(16 downto 34)` and `(35 downto 40)`
-  are written as `(34 downto 16)` and `(40 downto 35)`, assuming
-  `input_LEDS(0)` belongs on bit 16 (to be confirmed against the front
-  panel), and bits 44 to 47 are set to 0.
+  are written as `(34 downto 16)` and `(40 downto 35)`, with
+  `input_LEDS(0)` on bit 16, and bits 44 to 47 are set to 0. The board
+  schematics confirm this order (see "Checked against the board schematics").
 - `FIM2_HWInterface.vhd`: the Timming input no longer has its own IBUFDS on
-  `HPA_p(4)`/`HPA_n(4)`; it reads RFDet3's buffer on the same pin. Which
-  input belongs on HPA(4) is to be confirmed.
+  `HPA_p(4)`/`HPA_n(4)`; it reads RFDet3's buffer on the same pin. The board
+  schematics show HPA(4) is RF detector 3 and Timing is on HPB(3), so this
+  is a stopgap (see below).
 
 Bring-up changes outside the sources: the block design drives
 `FIM2_HWInterface.reset` from `peripheral_reset` (active high) instead of the
@@ -148,3 +149,46 @@ Known problems in the carrier sources, left as supplied:
   except the 25 MHz clock reaches the logic. It declares all 203 `som240_*`
   ports but uses 72, leaving the bank 224 GT pins and `HPB(10)` (bank 44, no
   `IOSTANDARD`) as top-level ports.
+
+## Checked against the board schematics
+
+Checked against the KiCad board designs (git.cells.es/electronics/fim2,
+commit c4e2518): MainBoard, RearBoard and FrontBoard. The two MainBoard
+flat cables, J5 to RearBoard J1 (HPA, LPA) and J6 to RearBoard J2 (HPB,
+LPB), reverse the pin order: MainBoard pin n mates with RearBoard pin 51-n.
+
+- **Pins.** All 62 pins `fim2_top` uses land on the expected MainBoard net
+  at the SOM (U14), for example `HPA_p(4)` on `HPA.P4` and LED1 on `LED1`.
+- **Inputs.** 17 of the 18 inputs read the right RearBoard signal: ArcDet1-6
+  on HPB1, HPB2, HPA10, HPB0, HPA7, HPA8 (`Arc_Det_1_1` ... `Arc_Det_3_2`),
+  RFDet1-4 on HPA6-3, SSPA1-2 on HPA9 and HPA2, Spare1-2 on HPA1 and HPA0,
+  Vacuum on LPB0, EPS on LPB3, Manual alarm on LPB4, Manual reset on LPB5
+  (`Reset_Alarm`).
+- **Timing is on HPB(3), not HPA(4).** `Tim_Det_IN` reaches MainBoard
+  `HPB.P3`/`HPB.N3` (SOM240_1 B1/B2), which `FIM2_HWInterface` does not use.
+  The original `kria_starter_kit_wrapper.vhd` and `fim2.xdc` do map HPB(3) to
+  those pins as LVDS (package pins C1/B1). Not changed: whether to move the
+  Timming IBUFDS to `HPB_p(3)`/`HPB_n(3)` is for the design owner.
+- **Outputs.** All six match: PinDiode1-2 on HPB6-7, Timing1-2 on HPB4-5,
+  Spare on HPB8, EPS on HPB9, and FPGA_Ready on LPB6.
+- **Shift register chain.** FPGA, RearBoard U33 and U34 (`CTRL_OUT0-15`),
+  FrontBoard U2 to U5 (LEDs), FrontBoard U6 to U8 (disable switches), back to
+  the FPGA. After a frame `TX(0)` is in U33 QA and `TX(47)` in U5 QH.
+  - Bits 0-15: RearBoard `CTRL_OUT0-15` (the firmware sends 0).
+  - Bits 16-34: the 19 red LEDs, in the firmware's `input_LEDS` order: Arc Det
+    1-6, RF Det 1-4, SSPA 1-2, Vacuum, Timing, EPS, Spare 1-2, M Alarm,
+    R Alarm.
+  - Bits 35-40: the six blue Output LEDs, top to bottom.
+  - Bit 41: the amber Reset LED. Bits 42-43: the red/green Status LED.
+  - Bits 44-47: not connected.
+- **Disable switches.** `RX(0-19)` are switches SW1 positions 1-10 and SW2
+  positions 1-10; `RX(20-23)` are tied low. A closed switch reads 0, which
+  disables that input in the `FIM2` core (`disableSW and FIM_i`). This is why
+  the original block design sets `C_INPUTS` to 20: 20 switches, of which the
+  18 inputs use the first 18.
+
+Open questions for the design owner: Timing on HPB(3); whether `FIM2` should
+drive the outputs (today they follow inputs 11-16 directly); what the
+`Manual_RST` port of `FIM2` is for, since `Reset_Alarm` is only used
+in `FIM2_HWInterface`; and the labels of the six Output LEDs, which are not
+on the FrontBoard silkscreen.
