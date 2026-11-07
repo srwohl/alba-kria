@@ -2,8 +2,9 @@
 --
 -- Bring-up layer 1: LED1 toggles once a second from the 25 MHz board clock,
 -- as FIM2_HWInterface does, which shows that the clock arrives and the
--- bitstream loads. The block design (PS only for now) is instantiated so
--- the hardware handoff matches the bitstream.
+-- bitstream loads. The block design is instantiated so the hardware
+-- handoff matches the bitstream; from layer 2 it holds the PS-to-PL AXI
+-- bus and a BRAM, all inside the block design.
 --
 -- Ports keep the SOM240 connector names used by the original constraints
 -- (carriers/fim2/xdc/fim2.xdc); pins are set in fim2_top.xdc.

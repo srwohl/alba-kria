@@ -29,6 +29,7 @@ SDTGEN           ?= sdtgen
 DTC              ?= dtc
 DTS_CPP          ?= cpp
 XSDB             ?= xsdb
+BOOTGEN          ?= bootgen
 REPO             ?= repo
 BITBAKE          ?= bitbake
 GEN_MACHINE_CONF ?= gen-machine-conf
@@ -121,7 +122,7 @@ config: ## Show the resolved carrier and tool settings
 ##@ Hardware (Vivado)
 
 xsa: $(XSA) ## Export hardware handoff to build/<carrier>/<carrier>.xsa
-bit: $(BIT) ## Build the PL bitstream to build/<carrier>/<carrier>.bit
+bit: $(BIT) ## Build the PL bitstream: build/<carrier>/<carrier>.bit and .bit.bin
 sdt: $(SDT) ## Generate system device tree in build/<carrier>/sdt
 
 # Block design edits: make gui, edit and save, make bd-export, commit BD_TCL.
@@ -155,12 +156,17 @@ $(XSA): $(BD_TCL) $(HDL_SOURCES) $(XDC_SOURCES) $(HDL_DIRS) Makefile scripts/viv
 	@test -s $@ || { echo "Vivado did not produce $@" >&2; exit 1; }
 
 # Synthesis and implementation run in the project make xsa created, so
-# make gui shows the same runs and reports.
+# make gui shows the same runs and reports. <carrier>.bit is for JTAG;
+# <carrier>.bit.bin is for the Linux FPGA manager, which (unlike JTAG with a
+# bitstream-less BOOT.BIN) also opens the PS-PL interfaces and resets the PL.
 $(BIT): $(XSA) scripts/vivado/build_bit.tcl
 	@test -n "$(TOP)" || { echo "Carrier $(CARRIER) has no PL logic (no TOP in carrier.mk)." >&2; exit 1; }
 	cd $(OUT) && $(IN_VIVADO) "$(VIVADO)" -mode batch -notrace -log logs/bit.log -journal logs/bit.jou \
 	    -source $(CURDIR)/scripts/vivado/build_bit.tcl -tclargs $(CURDIR)/$(PROJECT) $(CURDIR)/$@ $(VIVADO_JOBS)
 	@test -s $@ || { echo "Vivado did not produce $@" >&2; exit 1; }
+	cd $(OUT) && printf 'all:\n{\n\t%s\n}\n' $(CARRIER).bit > $(CARRIER).bif && \
+	    $(IN_VIVADO) "$(BOOTGEN)" -arch zynqmp -image $(CARRIER).bif -process_bitstream bin -w on > logs/bootgen.log
+	@test -s $@.bin || { echo "bootgen did not produce $@.bin" >&2; exit 1; }
 
 $(SDT): $(XSA) $(DTSI) scripts/generate_sdt.sh
 	$(IN_VIVADO) bash scripts/generate_sdt.sh "$(XSA)" "$(SDTGEN)" "$(DTC)" "$(DTS_CPP)" $(DTSI)

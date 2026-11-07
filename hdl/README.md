@@ -33,9 +33,10 @@ not by itself instantiate them; a block design does that.
 
 The FIM2 PL design is being brought up in layers, one commit each:
 
-1. 25 MHz clock and LED1 (current): `carriers/fim2/hdl/fim2_top.vhd` blinks
-   LED1; the block design is PS only.
-2. PS-to-PL AXI: SmartConnect, processor reset and the 8 KB BRAM.
+1. 25 MHz clock and LED1: `carriers/fim2/hdl/fim2_top.vhd` blinks LED1;
+   the block design is PS only. Tested on the board.
+2. PS-to-PL AXI (current): `M_AXI_HPM0_FPD`, SmartConnect, processor reset
+   and the 8 KB BRAM at 0xA000_0000, as in the original design.
 3. Outputs: `FIM2_HWInterface`, shift register, PMOD debug pins.
 4. Inputs: single-ended `LPB` inputs, then the LVDS inputs and outputs.
 5. The `FIM2` AXI core in the signal path, with its device tree node.
@@ -43,7 +44,11 @@ The FIM2 PL design is being brought up in layers, one commit each:
 
 For each layer, `carrier.mk` lists the HDL (`HDL_SOURCES`) and constraints
 (`XDC_SOURCES`, in `carriers/fim2/xdc/fim2_top.xdc`) that are loaded, and
-`make CARRIER=fim2 bit` builds `build/fim2/fim2.bit`. The original
+`make CARRIER=fim2 bit` builds `build/fim2/fim2.bit` and `fim2.bit.bin`.
+From layer 2 on, load `fim2.bit.bin` from Linux through the FPGA manager,
+not over JTAG: BOOT.BIN has no bitstream, so its FSBL leaves the PS-PL
+interfaces isolated and the PL in reset, and only a PMU firmware load
+(the FPGA manager) releases them. The original
 `fim2.xdc` is kept as supplied and not loaded.
 
 The complete original design, rebuilt as a block design, is in commit
