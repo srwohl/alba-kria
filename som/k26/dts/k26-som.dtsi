@@ -15,7 +15,8 @@
 		/*
 		 * Development layout for the raw boot.bin programmed at QSPI
 		 * offset 0.  This is not the Kria Image Selector/A-B/recovery
-		 * layout.  scripts/flash.sh enforces the 2 MiB boot partition.
+		 * layout.  scripts/flash.sh enforces the 16 MiB boot partition,
+		 * sized for an uncompressed bitstream in boot.bin.
 		 */
 		partitions {
 			compatible = "fixed-partitions";
@@ -23,14 +24,14 @@
 			#size-cells = <1>;
 
 			partition@0 {
-				label = "Boot Image (FSBL, PMU, ATF, U-Boot)";
-				reg = <0x0 0x200000>; /* raw boot.bin, aligned to 2MB */
+				label = "Boot Image (FSBL, PMU, bitstream if any, ATF, U-Boot)";
+				reg = <0x0 0x1000000>; /* raw boot.bin, 16MB */
 				read-only;
 				lock;
 			};
-			partition@200000 {
+			partition@1000000 {
 				label = "QSPI User";
-				reg = <0x200000 0x3e00000>; /* remainder of 64MB flash */
+				reg = <0x1000000 0x3000000>; /* remainder of 64MB flash */
 			};
 		};
 	};
