@@ -1,14 +1,16 @@
-# Synthesize and implement a carrier's project (as created by export_xsa.tcl)
-# and copy the bitstream out of the run directory.
+# Synthesize and implement a carrier's project (as created by export_xsa.tcl),
+# copy the bitstream out of the run directory, and export a second XSA that
+# includes it. SDTGen copies that bitstream into the SDT, and gen-machine-conf
+# then puts it in BOOT.BIN.
 #
-# vivado -mode batch -source build_bit.tcl -tclargs <project.xpr> <output.bit> <jobs>
+# vivado -mode batch -source build_bit.tcl -tclargs <project.xpr> <output.bit> <output.xsa> <jobs>
 #
 # All paths must be absolute.
-if {[llength $argv] != 3} {
-    puts stderr "usage: -tclargs <project.xpr> <output.bit> <jobs>"
+if {[llength $argv] != 4} {
+    puts stderr "usage: -tclargs <project.xpr> <output.bit> <output.xsa> <jobs>"
     exit 1
 }
-lassign $argv xpr bit jobs
+lassign $argv xpr bit xsa jobs
 
 if {[catch {
     open_project $xpr
@@ -26,8 +28,10 @@ if {[catch {
     }
     file copy -force $run_bit $bit
     puts "Timing: WNS [get_property STATS.WNS $impl] ns, WHS [get_property STATS.WHS $impl] ns"
+    open_run impl_1
+    write_hw_platform -fixed -include_bit -force $xsa
     close_project
-    puts "Wrote $bit"
+    puts "Wrote $bit and $xsa"
 } message options]} {
     puts stderr "Bitstream build failed: $message"
     puts stderr [dict get $options -errorinfo]

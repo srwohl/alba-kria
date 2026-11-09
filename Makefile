@@ -75,6 +75,10 @@ OUT         := $(BUILD)/$(CARRIER)
 LOGS        := $(OUT)/logs
 XSA         := $(OUT)/$(CARRIER).xsa
 BIT         := $(OUT)/$(CARRIER).bit
+# XSA with the bitstream, written by make bit. For carriers with PL logic the
+# SDT is generated from it, so BOOT.BIN loads the PL at boot.
+BIT_XSA     := $(OUT)/$(CARRIER)_bit.xsa
+SDT_XSA     := $(if $(TOP),$(BIT_XSA),$(XSA))
 SDT         := $(OUT)/sdt/.generated
 # Vivado project, rebuilt from BD_TCL by make xsa and opened by make gui.
 PROJECT     := $(OUT)/vivado/$(CARRIER).xpr
@@ -164,14 +168,17 @@ $(XSA): $(BD_TCL) $(HDL_SOURCES) $(XDC_SOURCES) $(HDL_DIRS) Makefile scripts/viv
 $(BIT): $(XSA) scripts/vivado/build_bit.tcl
 	@test -n "$(TOP)" || { echo "Carrier $(CARRIER) has no PL logic (no TOP in carrier.mk)." >&2; exit 1; }
 	cd $(OUT) && $(IN_VIVADO) "$(VIVADO)" -mode batch -notrace -log logs/bit.log -journal logs/bit.jou \
-	    -source $(CURDIR)/scripts/vivado/build_bit.tcl -tclargs $(CURDIR)/$(PROJECT) $(CURDIR)/$@ $(VIVADO_JOBS)
+	    -source $(CURDIR)/scripts/vivado/build_bit.tcl -tclargs $(CURDIR)/$(PROJECT) $(CURDIR)/$@ $(CURDIR)/$(BIT_XSA) $(VIVADO_JOBS)
 	@test -s $@ || { echo "Vivado did not produce $@" >&2; exit 1; }
 	cd $(OUT) && printf 'all:\n{\n\t%s\n}\n' $(CARRIER).bit > $(CARRIER).bif && \
 	    $(IN_VIVADO) "$(BOOTGEN)" -arch zynqmp -image $(CARRIER).bif -process_bitstream bin -w on > logs/bootgen.log
 	@test -s $@.bin || { echo "bootgen did not produce $@.bin" >&2; exit 1; }
 
-$(SDT): $(XSA) $(DTSI) scripts/generate_sdt.sh
-	$(IN_VIVADO) bash scripts/generate_sdt.sh "$(XSA)" "$(SDTGEN)" "$(DTC)" "$(DTS_CPP)" $(DTSI)
+$(BIT_XSA): $(BIT)
+	@test -s $@ || { echo "$@ is missing; rebuild with: rm $(BIT) && make CARRIER=$(CARRIER) bit" >&2; exit 1; }
+
+$(SDT): $(SDT_XSA) $(DTSI) scripts/generate_sdt.sh
+	$(IN_VIVADO) bash scripts/generate_sdt.sh "$(SDT_XSA)" "$(SDTGEN)" "$(DTC)" "$(DTS_CPP)" $(DTSI)
 
 ##@ Software (Yocto)
 
